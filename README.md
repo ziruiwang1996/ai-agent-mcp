@@ -1,4 +1,4 @@
-AI Research Assistant for Life Sciences
+# AI Research Assistant for Life Sciences #
 
 The system uses agents to:
 - Understand the question
@@ -7,6 +7,7 @@ The system uses agents to:
 - Optionally suggest next experiments or related targets
 
 Project Structure
+```
 ai_agent/
 ├── agents/
 │   ├── user_proxy.py              # Receives user input and updates context
@@ -23,7 +24,7 @@ ai_agent/
 ├── main.py                        # Main script to orchestrate agents
 ├── examples/
 │   └── sample_run.py              # Simple demo using a sample input
-
+```
 
 Agents & Context Flow
 | Agent                        | Role         | Description                                                               |
