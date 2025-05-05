@@ -1,6 +1,6 @@
 # AI Research Assistant for Life Sciences #
 
-The system uses agents to:
+The system uses Context Model Protocol to ask agents to:
 - Understand the question
 - Retrieve and summarize scientific literature
 - Track findings in a shared context
