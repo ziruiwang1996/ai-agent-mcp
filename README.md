@@ -61,7 +61,7 @@ ai-agent-mcp/src
 
 ## Configuration
 
-MCP server configuration is in [`mcp-server/server_config.json`](mcp-server/server_config.json):
+MCP server configuration is in [`mcp-server/server_config.json`](src/client/server_config.json):
 
 ```json
 {
