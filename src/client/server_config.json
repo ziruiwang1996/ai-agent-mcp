@@ -1,0 +1,38 @@
+{
+    "mcpServers": {
+        "filesystem": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "."
+            ]
+        },
+        
+        "fetch": {
+            "command": "uvx",
+            "args": ["mcp-server-fetch"]
+        },
+
+        "arxiv_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/arxiv_server.py"]
+        },
+
+        "openfda_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/openfda_server.py"]
+        },
+
+        "clinicaltrials_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/clinicaltrials_server.py"]
+        },
+
+        "pdb_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/pdb_server.py"]
+        }
+        
+    }
+}
