@@ -7,17 +7,22 @@ A modular AI agent framework that connects chatbots (Gemini, HuggingFace) to mul
 ## Project Structure
 
 ```
-ai-agent-mcp/
+ai-agent-mcp/src
 │
 ├── host/
-│   ├── gemini_chatbot.py
-│   └── huggingface_chatbot.py
+│   └── gemini_chatbot.py
+│
+├── client/
+│   ├── gemini_client.py
+│   └── server_config.json
 │
 ├── mcp-server/
 │   ├── arxiv_server.py
-│   ├── openFDA_server.py
+│   ├── clinicaltrials_server.py
+│   ├── openfda_server.py
 │   ├── pdb_server.py
-│   └── server_config.json
+│   ├── rdkit_server.py (future integration)
+│   └── pubmed_server.py (future integration)
 │
 ├── .env
 ├── .gitignore
@@ -69,14 +74,32 @@ MCP server configuration is in [`mcp-server/server_config.json`](mcp-server/serv
                 "."
             ]
         },
-        "arxiv_paper_search": {
-            "command": "python3",
-            "args": ["mcp-server/arxiv_server.py"]
-        },
+        
         "fetch": {
             "command": "uvx",
             "args": ["mcp-server-fetch"]
+        },
+
+        "arxiv_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/arxiv_server.py"]
+        },
+
+        "openfda_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/openfda_server.py"]
+        },
+
+        "clinicaltrials_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/clinicaltrials_server.py"]
+        },
+
+        "pdb_server": {
+            "command": "python3",
+            "args": ["src/mcp-server/pdb_server.py"]
         }
+        
     }
 }
 ```
