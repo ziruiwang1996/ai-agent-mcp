@@ -11,10 +11,12 @@ ai-agent-mcp/
 │
 ├── src/
 │   ├── host/
-│   │   └── gemini_chatbot.py        # Gemini chatbot implementation
+│   │   ├── gemini_chatbot.py        # Gemini chatbot implementation
+│   │   └── HuggingFace_LLM.py       # Future integration
 │   │
 │   ├── client/
 │   │   ├── gemini_client.py         # Gemini client for tool management
+│   │   ├── huggingface_client.py    # Future integration
 │   │   └── server_config.json       # Configuration for MCP servers
 │   │
 │   ├── mcp-server/
@@ -22,8 +24,8 @@ ai-agent-mcp/
 │   │   ├── clinicaltrials_server.py # MCP server for ClinicalTrials data
 │   │   ├── openfda_server.py        # MCP server for OpenFDA data
 │   │   ├── pdb_server.py            # MCP server for PDB data
-│   │   ├── rdkit_server.py          # (Future integration)
-│   │   └── pubmed_server.py         # (Future integration)
+│   │   ├── rdkit_server.py          # Future integration
+│   │   └── pubmed_server.py         # Future integration
 │   │
 │   ├── fastapi_app.py               # FastAPI app for chatbot API
 │   └── __init__.py
@@ -181,4 +183,4 @@ Or, let the chatbot start them as subprocesses according to `server_config.json`
 - [Google Gemini](https://ai.google.dev/)
 - [HuggingFace](https://huggingface.co/)
 - [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol)
-- [Streamlit] (https://streamlit.io)
+- [Streamlit](https://streamlit.io)
