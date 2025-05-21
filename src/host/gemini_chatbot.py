@@ -1,10 +1,9 @@
 from dotenv import load_dotenv
 import os
-import sys
 from google import genai
 from google.genai import types
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from client.gemini_client import GeminiClient
+from ..client.gemini_client import GeminiClient
+import asyncio
 
 load_dotenv()
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
@@ -39,7 +38,7 @@ class GeminiChatBot:
         config = types.GenerateContentConfig(
             tools=self.gemini_client.available_tools,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-            max_output_tokens=2048,
+            max_output_tokens=2048
         )
 
         response: types.GenerateContentResponse = self.gemini.models.generate_content(
@@ -57,7 +56,7 @@ class GeminiChatBot:
                 fc_args = fc.args
 
                 try: 
-                    print(f"Calling tool {fc_name} with args {fc_args}")
+                    yield f"[CALLING TOOL: {fc_name} with args {fc_args}]\n"
                     session = self.gemini_client.tool_session_map[fc_name]
                     result = await session.call_tool(fc_name, arguments=fc_args)
 
@@ -82,35 +81,16 @@ class GeminiChatBot:
                 )
                     
                 if not response.function_calls:
-                    print(response.text)
+                    # No more function calls → stream out the final text
+                    if response.text:
+                        for word in response.text:
+                            yield word
+                            await asyncio.sleep(0)  # flush to the client immediately
                     break
             else:
-            # Pure text response—just print and exit
-                print(response.text)
+                # Pure text response
+                if response.text:
+                    for word in response.text:
+                        yield word
+                        await asyncio.sleep(0)  # flush to the client immediately
                 break
-        
-    async def chat_loop(self):
-        """Run an interactive chat loop"""
-        print("\nMCP Chatbot Started!")
-        print("Type your queries or 'quit' to exit.")
-        while True:
-            try:
-                query = input("\nQuery: ").strip()
-        
-                if query.lower() == 'quit':
-                    break
-                    
-                await self.process_query(query)
-                print("\n")
-                    
-            except Exception as e:
-                print(f"\nError: {str(e)}")
-    
-
-async def main():
-    async with GeminiChatBot() as chatbot:
-        await chatbot.chat_loop()
-
-import asyncio
-if __name__ == "__main__":
-    asyncio.run(main())

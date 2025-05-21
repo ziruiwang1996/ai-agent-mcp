@@ -1,9 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
-import io
-from contextlib import redirect_stdout, asynccontextmanager
+from contextlib import asynccontextmanager
 from .host.gemini_chatbot import GeminiChatBot 
+from fastapi.responses import StreamingResponse
 
 chatbot = GeminiChatBot()
 @asynccontextmanager
@@ -27,18 +26,9 @@ app.add_middleware(
 
 @app.post("/chat")
 async def chat(request: Request):
-    """Handle chat queries from the front-end."""
+    """Stream chat queries from the front-end."""
     data = await request.json()
     query = data.get("query", "")
 
-    # Capture printed output
-    buf = io.StringIO()
-    try:
-        with redirect_stdout(buf):
-            await chatbot.process_query(query)
-    except Exception as e:
-        return {"error": str(e)}
-
-    # Return the captured output as the response
-    output = buf.getvalue()
-    return {"response": output}
+    generator = chatbot.process_query(query)
+    return StreamingResponse(generator, media_type="text/plain; charset=utf-8")
