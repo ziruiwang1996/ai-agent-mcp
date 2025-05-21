@@ -1,0 +1,59 @@
+{
+  "1905.07844v1": {
+    "title": "Implications of Computer Vision Driven Assistive Technologies Towards Individuals with Visual Impairment",
+    "authors": [
+      "Linda Wang",
+      "Alexander Wong"
+    ],
+    "summary": "Computer vision based technology is becoming ubiquitous in society. One\napplication area that has seen an increase in computer vision is assistive\ntechnologies, specifically for those with visual impairment. Research has shown\nthe ability of computer vision models to achieve tasks such provide scene\ncaptions, detect objects and recognize faces. Although assisting individuals\nwith visual impairment with these tasks increases their independence and\nautonomy, concerns over bias, privacy and potential usefulness arise. This\npaper addresses the positive and negative implications computer vision based\nassistive technologies have on individuals with visual impairment, as well as\nconsiderations for computer vision researchers and developers in order to\nmitigate the amount of negative implications.",
+    "pdf_url": "http://arxiv.org/pdf/1905.07844v1",
+    "published": "2019-05-20"
+  },
+  "1310.0319v3": {
+    "title": "Second Croatian Computer Vision Workshop (CCVW 2013)",
+    "authors": [
+      "Sven Lon\u010dari\u0107",
+      "Sini\u0161a \u0160egvi\u0107"
+    ],
+    "summary": "Proceedings of the Second Croatian Computer Vision Workshop (CCVW 2013,\nhttp://www.fer.unizg.hr/crv/ccvw2013) held September 19, 2013, in Zagreb,\nCroatia. Workshop was organized by the Center of Excellence for Computer Vision\nof the University of Zagreb.",
+    "pdf_url": "http://arxiv.org/pdf/1310.0319v3",
+    "published": "2013-10-01"
+  },
+  "1707.03720v1": {
+    "title": "Multiband NFC for High-Throughput Wireless Computer Vision Sensor Network",
+    "authors": [
+      "F. Li",
+      "J. Du"
+    ],
+    "summary": "Vision sensors lie in the heart of computer vision. In many computer vision\napplications, such as AR/VR, non-contacting near-field communication (NFC) with\nhigh throughput is required to transfer information to algorithms. In this\nwork, we proposed a novel NFC system which utilizes multiple frequency bands to\nachieve high throughput.",
+    "pdf_url": "http://arxiv.org/pdf/1707.03720v1",
+    "published": "2017-05-28"
+  },
+  "1910.13796v1": {
+    "title": "Deep Learning vs. Traditional Computer Vision",
+    "authors": [
+      "Niall O' Mahony",
+      "Sean Campbell",
+      "Anderson Carvalho",
+      "Suman Harapanahalli",
+      "Gustavo Velasco-Hernandez",
+      "Lenka Krpalkova",
+      "Daniel Riordan",
+      "Joseph Walsh"
+    ],
+    "summary": "Deep Learning has pushed the limits of what was possible in the domain of\nDigital Image Processing. However, that is not to say that the traditional\ncomputer vision techniques which had been undergoing progressive development in\nyears prior to the rise of DL have become obsolete. This paper will analyse the\nbenefits and drawbacks of each approach. The aim of this paper is to promote a\ndiscussion on whether knowledge of classical computer vision techniques should\nbe maintained. The paper will also explore how the two sides of computer vision\ncan be combined. Several recent hybrid methodologies are reviewed which have\ndemonstrated the ability to improve computer vision performance and to tackle\nproblems not suited to Deep Learning. For example, combining traditional\ncomputer vision techniques with Deep Learning has been popular in emerging\ndomains such as Panoramic Vision and 3D vision for which Deep Learning models\nhave not yet been fully optimised",
+    "pdf_url": "http://arxiv.org/pdf/1910.13796v1",
+    "published": "2019-10-30"
+  },
+  "1808.03998v1": {
+    "title": "Enhancing camera surveillance using computer vision: a research note",
+    "authors": [
+      "Haroon Idrees",
+      "Mubarak Shah",
+      "Ray Surette"
+    ],
+    "summary": "$\\mathbf{Purpose}$ - The growth of police operated surveillance cameras has\nout-paced the ability of humans to monitor them effectively. Computer vision is\na possible solution. An ongoing research project on the application of computer\nvision within a municipal police department is described. The paper aims to\ndiscuss these issues.\n  $\\mathbf{Design/methodology/approach}$ - Following the demystification of\ncomputer vision technology, its potential for police agencies is developed\nwithin a focus on computer vision as a solution for two common surveillance\ncamera tasks (live monitoring of multiple surveillance cameras and summarizing\narchived video files). Three unaddressed research questions (can specialized\ncomputer vision applications for law enforcement be developed at this time, how\nwill computer vision be utilized within existing public safety camera\nmonitoring rooms, and what are the system-wide impacts of a computer vision\ncapability on local criminal justice systems) are considered.\n  $\\mathbf{Findings}$ - Despite computer vision becoming accessible to law\nenforcement agencies the impact of computer vision has not been discussed or\nadequately researched. There is little knowledge of computer vision or its\npotential in the field.\n  $\\mathbf{Originality/value}$ - This paper introduces and discusses computer\nvision from a law enforcement perspective and will be valuable to police\npersonnel tasked with monitoring large camera networks and considering computer\nvision as a system upgrade.",
+    "pdf_url": "http://arxiv.org/pdf/1808.03998v1",
+    "published": "2018-08-12"
+  }
+}
