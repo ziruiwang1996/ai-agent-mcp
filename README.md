@@ -45,7 +45,7 @@ ai-agent-mcp/
 
 1. **Clone the repository**
     ```sh
-    git clone <your-repo-url>
+    git clone <repo-url>
     cd ai-agent-mcp
     ```
 
