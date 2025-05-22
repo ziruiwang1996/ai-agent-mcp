@@ -24,6 +24,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# @app.post("/connect")
+# async def connect(api_key: str):
+#     try:
+#         await chatbot.connect(api_key)
+#         return 200
+#     except Exception as e:
+#         print(f"Error connecting to Gemini API: {str(e)}")
+#         return 400
+
 @app.post("/chat")
 async def chat(request: Request):
     """Stream chat queries from the front-end."""

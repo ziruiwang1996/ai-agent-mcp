@@ -1,7 +1,7 @@
 import streamlit as st, requests, time
 
 with st.sidebar:
-    openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
+    gemini_api_key = st.text_input("Gemini API Key", key="chatbot_api_key", type="password")
     "[Get an Google Gemini API key](https://ai.google.dev/gemini-api/docs/api-key)"
     "[View the source code](https://github.com/ziruiwang1996/ai-agent-mcp)"
 
@@ -14,6 +14,10 @@ for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
 if prompt := st.chat_input():
+    # if not gemini_api_key:
+    #     st.info("Please add your Gemini API key to continue.")
+    #     st.stop()
+
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
@@ -24,7 +28,7 @@ if prompt := st.chat_input():
             response_placeholder = st.empty()
 
             response = requests.post(
-                "http://localhost:8000/chat",
+                "http://fastapi:8000/chat",
                 json={"query": prompt},
                 stream=True 
             )
