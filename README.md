@@ -49,6 +49,27 @@ ai-agent-mcp/
     cd ai-agent-mcp
     ```
 
+2. **Set up environment variables**
+    Create a `.env` file in the project root:
+    ```
+    GEMINI_API_KEY=your-gemini-api-key
+    ```
+
+3. **Build, start, and stop the service**
+    ```
+    docker-compose build
+    docker-compose up
+    docker-compose down
+    ```
+
+# or
+
+1. **Clone the repository**
+    ```sh
+    git clone <repo-url>
+    cd ai-agent-mcp
+    ```
+
 2. **Create a virtual environment**
     ```sh
     python3 -m venv .
@@ -65,6 +86,10 @@ ai-agent-mcp/
     ```
     GEMINI_API_KEY=your-gemini-api-key
     ```
+
+# Access the Services
+- FastAPI Backend: http://localhost:8000
+- Streamlit Frontend: http://localhost:8501
 
 ---
 
