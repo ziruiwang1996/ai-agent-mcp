@@ -62,7 +62,7 @@ ai-agent-mcp/
     docker-compose down
     ```
 
-# or
+### or
 
 1. **Clone the repository**
     ```sh
@@ -87,7 +87,10 @@ ai-agent-mcp/
     GEMINI_API_KEY=your-gemini-api-key
     ```
 
-# Access the Services
+---
+
+## Access the Services
+
 - FastAPI Backend: http://localhost:8000
 - Streamlit Frontend: http://localhost:8501
 
