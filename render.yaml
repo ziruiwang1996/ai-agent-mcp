@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: ai-agent-mcp
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter # Choose an appropriate plan based on your needs
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # This requires you to set the value in the Render dashboard
+    healthCheckPath: /docs
+    numInstances: 1
+    buildFilter:
+      paths:
+        - Dockerfile
+        - "**.py"
+        - "requirements.txt"
+        - "client/server_config.json"
