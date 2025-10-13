@@ -1,34 +1,23 @@
 {
     "mcpServers": {
         "arxiv_server": {
-            "transport": "stdio",
             "command": "python3",
             "args": ["mcp-server/arxiv_server.py"]
         },
 
         "openfda_server": {
-            "transport": "stdio",
             "command": "python3",
             "args": ["mcp-server/openfda_server.py"]
         },
 
         "clinicaltrials_server": {
-            "transport": "stdio",
             "command": "python3",
             "args": ["mcp-server/clinicaltrials_server.py"]
         },
 
         "pdb_server": {
-            "transport": "stdio",
             "command": "python3",
             "args": ["mcp-server/pdb_server.py"]
-        },
-
-        "ask_dot": {
-            "transport": "streamable_http",
-            "url": "https://app.getdot.ai/ai/mcp",
-            "headers": { "API-KEY": "${ASK_DOT_API_KEY}" }
         }
-        
     }
 }

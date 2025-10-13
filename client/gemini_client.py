@@ -1,10 +1,12 @@
 import json
+import os
+import re
 from contextlib import AsyncExitStack
 from typing import List, Dict
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from google.genai import types
-import os
+from dotenv import load_dotenv
 
 class GeminiClient:
     def __init__(self):
@@ -16,9 +18,14 @@ class GeminiClient:
     async def connect_to_servers(self): 
         """Connect to all configured MCP servers."""
         try:
+            # Load environment variables from .env
+            load_dotenv()
             config_path = os.path.join(os.path.dirname(__file__), "server_config.json")
             with open(config_path, "r") as file:
-                data = json.load(file)
+                raw = file.read()
+                # Expand ${VARS} in JSON using environment values
+                expanded = self._expand_env_in_text(raw)
+                data = json.loads(expanded)
             servers = data.get("mcpServers", {})
             
             for server_name, server_config in servers.items():
@@ -27,9 +34,20 @@ class GeminiClient:
             print(f"Error loading server configuration: {e}")
             raise
 
+    def _expand_env_in_text(self, text: str) -> str:
+        pattern = re.compile(r"\$\{([A-Z0-9_]+)\}")
+        def repl(match):
+            var = match.group(1)
+            val = os.environ.get(var)
+            if val is None:
+                raise KeyError(f"Environment variable '{var}' not set for configuration substitution")
+            return val
+        return pattern.sub(repl, text)
+
     async def connect_to_server(self, server_name: str, server_config: dict) -> None:
         """Connect to a single MCP server."""
         try:
+            # For HTTP-based servers (like ask_dot), pass through arbitrary fields
             server_params = StdioServerParameters(**server_config)
             read, write = await self.exit_stack.enter_async_context(
                 stdio_client(server_params)
