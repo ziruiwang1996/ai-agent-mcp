@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Make MCP server files executable
+RUN chmod +x /app/mcp-server/*.py
+
 # Expose port that Render will use
 EXPOSE 10000
 
