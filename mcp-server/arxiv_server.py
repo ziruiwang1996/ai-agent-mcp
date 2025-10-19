@@ -96,7 +96,7 @@ def extract_info(paper_id: str) -> str:
     
     return f"There's no saved information related to paper {paper_id}."
 
-@mcp.resource("papers://folders")
+@mcp.resource("arxiv_papers://folders")
 def get_available_folders() -> str:
     """
     List all available topic folders in the papers directory.
@@ -125,7 +125,7 @@ def get_available_folders() -> str:
     
     return content
 
-@mcp.resource("papers://{topic}")
+@mcp.resource("arxiv_papers://{topic}")
 def get_topic_papers(topic: str) -> str:
     """
     Get detailed information about papers on a specific topic.

@@ -2,21 +2,21 @@ import os
 from pathlib import Path
 import asyncio
 import uuid
-from typing import Optional, List, Dict, Any, TypedDict, Annotated, Literal
+from typing import Optional, List, Dict, Any
 import json
+from datetime import datetime
 from client.utils import expand_env_in_text
-from langchain_core.documents import Document
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, END, MessagesState, StateGraph
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, PromptTemplate
-from langchain_core.messages import HumanMessage, trim_messages
-from langchain_core.messages import AIMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage, trim_messages
 from langchain_core.runnables import RunnableConfig
+from langchain_core.documents import Document
+from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.prebuilt import ToolNode
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -27,11 +27,6 @@ load_dotenv()
 # Set GOOGLE_API_KEY from GEMINI_API_KEY if not already set
 if not os.getenv("GOOGLE_API_KEY") and os.getenv("GEMINI_API_KEY"):
     os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
-
-class State(TypedDict):
-    question: str
-    context: List[Document]
-    answer: str
 
 class GeminiMCPChatbot:
     """
@@ -78,7 +73,6 @@ class GeminiMCPChatbot:
         # ═══════════════════════════════════════════════════════════════
         # RAG (Retrieval Augmented Generation) Components
         # ═══════════════════════════════════════════════════════════════
-        
         # Thread-scoped vector stores: Each chat thread gets its own vector store
         # This ensures user documents are isolated and can be cleaned up per session
         # Key: thread_id (UUID string) -> Value: InMemoryVectorStore instance
@@ -93,16 +87,11 @@ class GeminiMCPChatbot:
         # This is used when creating new vector stores for each thread
         self.embedding_model = GoogleGenerativeAIEmbeddings(model=self.embedding)
         
-        # Create default prompt template
+        # Default prompt template
         self.prompt_template = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful assistant. Answer all questions to the best of your ability."),
             MessagesPlaceholder(variable_name="messages"),
         ])
-        self.rag_prompt_template = PromptTemplate.from_template(
-            """You are a helpful assistant that answers questions using retrieved context. Use the following pieces of 
-            context to answer the question at the end. If you don’t know the answer, just say you don’t know — don’t try 
-            to make up an answer.\nContext:\n{context}\n\nQuestion:\n{question}\nHelpful Answer:"""
-        )
     
     async def initialize_mcp_client(self) -> None:
         """Initialize MCP client and retrieve tools."""
@@ -124,11 +113,9 @@ class GeminiMCPChatbot:
                     self.client = None
                 else:
                     print(f"Creating MCP client with {len(servers)} servers...")
-                    
                     # Debug: Show server configurations
                     for name, config in servers.items():
                         print(f"  {name}: command={config.get('command')}, args={config.get('args')}")
-                        
                         # Verify MCP server files exist
                         if config.get('args'):
                             script_path = config['args'][0]
@@ -136,10 +123,8 @@ class GeminiMCPChatbot:
                                 print(f"Script exists: {script_path}")
                             else:
                                 print(f"Script missing: {script_path}")
-                    
                     try:
                         self.client = MultiServerMCPClient(servers)
-                        
                         print("Getting tools (this may take a moment)...")
                         # Add a timeout to prevent hanging
                         self.tools = await asyncio.wait_for(self.client.get_tools(), timeout=self.timeout)
@@ -178,6 +163,14 @@ class GeminiMCPChatbot:
             allow_partial=False,
             start_on="human",
         )
+
+    async def initialize(self) -> None:
+        """Initialize all components of the chatbot."""
+        print("Starting initialization...")
+        await self.initialize_mcp_client()
+        self.initialize_model()
+        self.create_workflow()
+        print("Initialization complete!")
     
     def create_workflow(self) -> None:
         """
@@ -190,7 +183,7 @@ class GeminiMCPChatbot:
              │
              ▼
         ┌─────────────────┐
-        │  MODEL NODE     │  ◄─── RAG enhancement happens here
+        │  MODEL          │  ◄─── RAG enhancement happens here
         │  (call_model)   │       (retrieves docs if available)
         └────┬────────────┘
              │
@@ -219,7 +212,6 @@ class GeminiMCPChatbot:
         # ═══════════════════════════════════════════════════════════════
         # NODE DEFINITIONS
         # ═══════════════════════════════════════════════════════════════
-        
         # Core model node - handles RAG + tool binding
         # Note: We can't pass config directly here, it comes from ainvoke()
         workflow.add_node("model", self.call_model)
@@ -233,7 +225,6 @@ class GeminiMCPChatbot:
         # ═══════════════════════════════════════════════════════════════
         # ROUTING LOGIC
         # ═══════════════════════════════════════════════════════════════
-        
         def should_continue(state: MessagesState):
             """
             Decide whether to execute tools or finish.
@@ -250,20 +241,16 @@ class GeminiMCPChatbot:
             messages = state.get("messages", [])
             if not messages:
                 return "end"
-            
-            last = messages[-1]
-            
             # Check if last message has tool calls
             # tool_calls = [{"name": "search_arxiv", "args": {...}}, ...]
+            last = messages[-1]
             if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
-                return "tools" if tools_node is not None else "end"
-            
+                return "tools" if tools_node is not None else "end"         
             return "end"
 
         # ═══════════════════════════════════════════════════════════════
         # GRAPH CONSTRUCTION
         # ═══════════════════════════════════════════════════════════════
-        
         # Start edge: conversation begins at model node
         workflow.add_edge(START, "model")
 
@@ -282,17 +269,197 @@ class GeminiMCPChatbot:
         # ═══════════════════════════════════════════════════════════════
         # COMPILE WORKFLOW
         # ═══════════════════════════════════════════════════════════════
-        
         # MemorySaver: Persists conversation state across turns
         # Each thread_id gets its own conversation history
         self.app = workflow.compile(checkpointer=MemorySaver())
-        
-        print("✓ Workflow compiled with RAG + MCP tool support")
+        print("Workflow compiled with RAG + MCP tool support")
 
+    async def call_model(self, state: MessagesState, config: RunnableConfig) -> Dict[str, Any]:
+        """
+        Process messages through the model with optional RAG enhancement.
+        
+        This is the core processing function that:
+        1. Checks if user has uploaded documents (RAG available)
+        2. If RAG: Retrieves relevant context and augments prompt
+        3. If no RAG: Uses standard prompt
+        4. Trims message history to fit context window
+        5. Invokes model and returns response
+        
+        Args:
+            state: Current conversation state with messages
+            config: RunnableConfig containing thread_id and other settings
+            
+        Returns:
+            Dictionary with updated messages list
+            
+        Note:
+            - RAG augmentation happens BEFORE model invocation
+            - Retrieved context is injected into the system prompt
+            - This allows model to "see" document content without fine-tuning
+            - Falls back gracefully if no documents are available
+        """
+
+        # STEP 1: Extract thread_id from config
+        thread_id = None
+        if config and "configurable" in config:
+            thread_id = config["configurable"].get("thread_id")
+        
+        print(f"call_model - config type: {type(config)}, has configurable: {'configurable' in config if config else False}")
+        if config:
+            print(f"call_model - config keys: {config.keys() if hasattr(config, 'keys') else 'N/A'}")
+            print(f"call_model - thread_id extracted: {thread_id}")
+        
+        # STEP 2: Trim message history to fit context window
+        # This prevents "context length exceeded" errors
+        # Keeps recent messages and system prompt, discards old ones
+        trimmed_messages = self.trimmer.invoke(state["messages"])
+        # Get the latest user message (the current query)
+        last_message = trimmed_messages[-1] if trimmed_messages else None
+        user_query = last_message.content if last_message and hasattr(last_message, "content") else ""
+        
+        # STEP 3: RAG Decision 
+        # Instead of ALWAYS retrieving when docs exist, we intelligently
+        # decide if this specific query would benefit from RAG
+        should_retrieve = thread_id and self.should_use_rag(user_query, thread_id)
+        print(f"Should use RAG: {should_retrieve} (thread_id={thread_id})")
+        if thread_id and thread_id in self.thread_vector_stores:
+            print(f"Thread {thread_id[:8]} has documents in vector store")
+            print(f"Query: '{user_query[:100]}...' (should_use_rag={should_retrieve})")
+        
+        # STEP 4: RAG Enhancement (only if deemed necessary)
+        if should_retrieve:
+            # Retrieve relevant document chunks
+            # k=4 for better coverage
+            retrieved_docs = self.retrieve_context_for_query(thread_id, user_query, k=4)
+            
+            if retrieved_docs:
+                print(f"RAG: Retrieved {len(retrieved_docs)} relevant document chunks")
+                # Format retrieved context for injection into prompt
+                context_text = "\n\n".join([
+                    f"[Document Excerpt {i+1}]:\n{doc.page_content}"
+                    for i, doc in enumerate(retrieved_docs)
+                ])
+                
+                # Create RAG-enhanced prompt template
+                # This is the KEY to RAG: we inject retrieved content into the prompt
+                rag_prompt = ChatPromptTemplate.from_messages([
+                    ("system", 
+                     "You are a helpful assistant. You have access to document excerpts that may be relevant to the user's question.\n\n"
+                     "RELEVANT DOCUMENT CONTEXT:\n"
+                     "═══════════════════════════════════════\n"
+                     f"{context_text}\n"
+                     "═══════════════════════════════════════\n\n"
+                     "Instructions:\n"
+                     "1. Use the document context above to answer questions when relevant\n"
+                     "2. If the context doesn't contain the answer, say so - don't make things up\n"
+                     "3. Cite which document excerpt you're using (e.g., 'According to Document Excerpt 1...')\n"
+                     "4. You can also use your general knowledge and available tools when appropriate\n\n"
+                     "Answer all questions to the best of your ability."),
+                    MessagesPlaceholder(variable_name="messages"),
+                ])
+                
+                prompt = rag_prompt.invoke({"messages": trimmed_messages})
+                print(f"RAG: Augmented prompt with {len(retrieved_docs)} document excerpts")
+            else:
+                # No relevant documents found, use standard prompt
+                print("RAG: No relevant documents retrieved despite should_retrieve=True")
+                prompt = self.prompt_template.invoke({"messages": trimmed_messages})
+        else:
+            # Standard prompt (no RAG)
+            print(f"RAG: Skipped retrieval (query not deemed document-related)")
+            prompt = self.prompt_template.invoke({"messages": trimmed_messages})
+        
+        # STEP 5: Invoke model with (possibly augmented) prompt
+        response = await self.model_with_tools.ainvoke(prompt)
+        return {"messages": response}
+
+    def should_use_rag(self, query: str, thread_id: str) -> bool:
+        """
+        Intelligently decide whether to perform RAG retrieval for a query.
+        
+        This optimization prevents unnecessary retrieval operations for queries that:
+        - Are greetings or small talk
+        - Request tool usage (let tools handle it)
+        - Are very short (likely not document-related)
+        
+        Strategies used:
+        1. **No documents check**: Skip if no documents uploaded
+        2. **Query length check**: Very short queries unlikely to need documents
+        3. **Keyword detection**: Look for document-related keywords
+        4. **Tool request detection**: Skip if user wants to use external tools
+        
+        Args:
+            query: User's query text
+            thread_id: Thread to check for documents
+            
+        Returns:
+            True if RAG should be used, False otherwise
+            
+        Learning Note:
+            This saves ~100-300ms per query by avoiding unnecessary embeddings
+            and similarity searches when documents aren't relevant.
+        """
+        # STRATEGY 1: No vector store available → Skip RAG
+        if thread_id not in self.thread_vector_stores:
+            return False
+        
+        # STRATEGY 2: Vector store exists but is empty → Skip RAG
+        # Check multiple ways to determine if vector store has content
+        vector_store = self.thread_vector_stores[thread_id]
+        # Check the internal store attribute (InMemoryVectorStore specific)
+        if hasattr(vector_store, 'store') and len(vector_store.store) == 0:
+            print(f"Vector store exists for thread {thread_id[:8]} but store is empty")
+            return False
+        # Check document metadata tracking
+        if thread_id not in self.thread_documents or len(self.thread_documents[thread_id]) == 0:
+            print(f"Vector store exists for thread {thread_id[:8]} but no documents tracked")
+            return False
+        
+        # STRATEGY 3: Very short queries → Likely not document-related
+        if len(query.strip()) < 10:
+            return False
+        
+        # STRATEGY 4: Greetings and small talk → Skip RAG
+        greeting_patterns = [
+            "hello", "hi", "hey", "good morning", "good afternoon",
+            "good evening", "how are you", "what's up", "sup"
+        ]
+        query_lower = query.lower().strip()
+        # If query is ONLY a greeting (not a real question)
+        if any(query_lower == pattern or query_lower.startswith(pattern + " ") for pattern in greeting_patterns):
+            if "?" not in query and len(query.split()) < 5:
+                return False
+        
+        # STRATEGY 5: Tool/MCP requests → Let tools handle it
+        # If user explicitly asks for external data, documents aren't needed
+        tool_keywords = [
+            "search arxiv", "search pdb", "find protein", "clinical trial",
+            "search pubmed", "look up", "find on", "search for papers",
+            "what tools", "available tools", "can you search"
+        ]
+        if any(keyword in query_lower for keyword in tool_keywords):
+            return False
+        
+        # STRATEGY 6: Document-related keywords → USE RAG
+        # Strong signals that user wants to query their documents
+        document_keywords = [
+            "document", "paper", "article", "file", "uploaded", "in the",
+            "according to", "based on", "from the", "mentioned", "states",
+            "summarize", "summary", "explain", "what does", "section",
+            "page", "chapter", "quote", "reference"
+        ]
+        if any(keyword in query_lower for keyword in document_keywords):
+            return True
+        
+        # DEFAULT: Use RAG for medium/long queries
+        # If query is substantial (5+ words) and not excluded above,
+        # it's likely a real question that might benefit from documents
+        word_count = len(query.split())
+        return word_count >= 5
+    
     # ═══════════════════════════════════════════════════════════════
     # DOCUMENT MANAGEMENT METHODS (RAG)
     # ═══════════════════════════════════════════════════════════════
-    
     def get_or_create_vector_store(self, thread_id: str) -> InMemoryVectorStore:
         """
         Get existing vector store for a thread or create a new one.
@@ -361,7 +528,6 @@ class GeminiMCPChatbot:
                 loader = Docx2txtLoader(file_path)
             else:
                 raise ValueError(f"Unsupported file type: {file_extension}")
-            
             # Load the document (returns list of Document objects)
             docs = loader.load()
             
@@ -384,8 +550,6 @@ class GeminiMCPChatbot:
             vector_store.add_documents(documents=all_splits)
             
             # Step 5: Track document metadata
-            from datetime import datetime
-            
             # Different metadata for different file types
             # PDFs have pages, text files don't
             doc_metadata = {
@@ -405,14 +569,13 @@ class GeminiMCPChatbot:
             # Initialize documents list for this thread if needed
             if thread_id not in self.thread_documents:
                 self.thread_documents[thread_id] = []
-            
             self.thread_documents[thread_id].append(doc_metadata)
             
-            print(f"✓ Added document '{filename}' to thread {thread_id}: {len(all_splits)} chunks")
+            print(f"Added document '{filename}' to thread {thread_id}: {len(all_splits)} chunks")
             return doc_metadata
             
         except Exception as e:
-            print(f"✗ Error adding document: {e}")
+            print(f"Error adding document: {e}")
             raise
     
     def retrieve_context_for_query(self, thread_id: str, query: str, k: int = 4) -> List[Document]:
@@ -442,11 +605,9 @@ class GeminiMCPChatbot:
             return []
         
         vector_store = self.thread_vector_stores[thread_id]
-        
         # Perform similarity search
         # This finds chunks whose embeddings are closest to the query embedding
         retrieved_docs = vector_store.similarity_search(query, k=k)
-        
         print(f"Retrieved {len(retrieved_docs)} relevant chunks for query")
         return retrieved_docs
     
@@ -469,99 +630,11 @@ class GeminiMCPChatbot:
         """
         if thread_id in self.thread_vector_stores:
             del self.thread_vector_stores[thread_id]
-            print(f"✓ Cleared vector store for thread: {thread_id}")
+            print(f"Cleared vector store for thread: {thread_id}")
         
         if thread_id in self.thread_documents:
             del self.thread_documents[thread_id]
-            print(f"✓ Cleared document metadata for thread: {thread_id}")
-    
-    def should_use_rag(self, query: str, thread_id: str) -> bool:
-        """
-        Intelligently decide whether to perform RAG retrieval for a query.
-        
-        This optimization prevents unnecessary retrieval operations for queries that:
-        - Are greetings or small talk
-        - Request tool usage (let tools handle it)
-        - Are very short (likely not document-related)
-        
-        Strategies used:
-        1. **No documents check**: Skip if no documents uploaded
-        2. **Query length check**: Very short queries unlikely to need documents
-        3. **Keyword detection**: Look for document-related keywords
-        4. **Tool request detection**: Skip if user wants to use external tools
-        
-        Args:
-            query: User's query text
-            thread_id: Thread to check for documents
-            
-        Returns:
-            True if RAG should be used, False otherwise
-            
-        Learning Note:
-            This saves ~100-300ms per query by avoiding unnecessary embeddings
-            and similarity searches when documents aren't relevant.
-        """
-        # ═══════════════════════════════════════════════════════════════
-        # STRATEGY 1: No documents available → Skip RAG
-        # ═══════════════════════════════════════════════════════════════
-        if thread_id not in self.thread_vector_stores:
-            return False
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STRATEGY 2: Very short queries → Likely not document-related
-        # ═══════════════════════════════════════════════════════════════
-        # Examples: "hi", "ok", "thanks"
-        if len(query.strip()) < 10:
-            return False
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STRATEGY 3: Greetings and small talk → Skip RAG
-        # ═══════════════════════════════════════════════════════════════
-        greeting_patterns = [
-            "hello", "hi", "hey", "good morning", "good afternoon",
-            "good evening", "how are you", "what's up", "sup"
-        ]
-        query_lower = query.lower().strip()
-        
-        # If query is ONLY a greeting (not a real question)
-        if any(query_lower == pattern or query_lower.startswith(pattern + " ") for pattern in greeting_patterns):
-            if "?" not in query and len(query.split()) < 5:
-                return False
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STRATEGY 4: Tool/MCP requests → Let tools handle it
-        # ═══════════════════════════════════════════════════════════════
-        # If user explicitly asks for external data, documents aren't needed
-        tool_keywords = [
-            "search arxiv", "search pdb", "find protein", "clinical trial",
-            "search pubmed", "look up", "find on", "search for papers",
-            "what tools", "available tools", "can you search"
-        ]
-        
-        if any(keyword in query_lower for keyword in tool_keywords):
-            return False
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STRATEGY 5: Document-related keywords → USE RAG
-        # ═══════════════════════════════════════════════════════════════
-        # Strong signals that user wants to query their documents
-        document_keywords = [
-            "document", "paper", "article", "file", "uploaded", "in the",
-            "according to", "based on", "from the", "mentioned", "states",
-            "summarize", "summary", "explain", "what does", "section",
-            "page", "chapter", "quote", "reference"
-        ]
-        
-        if any(keyword in query_lower for keyword in document_keywords):
-            return True
-        
-        # ═══════════════════════════════════════════════════════════════
-        # DEFAULT: Use RAG for medium/long queries
-        # ═══════════════════════════════════════════════════════════════
-        # If query is substantial (5+ words) and not excluded above,
-        # it's likely a real question that might benefit from documents
-        word_count = len(query.split())
-        return word_count >= 5
+            print(f"Cleared document metadata for thread: {thread_id}")
     
     def get_thread_documents(self, thread_id: str) -> List[Dict[str, Any]]:
         """
@@ -575,128 +648,6 @@ class GeminiMCPChatbot:
         """
         return self.thread_documents.get(thread_id, [])
 
-        
-    async def call_model(self, state: MessagesState, config: RunnableConfig) -> Dict[str, Any]:
-        """
-        Process messages through the model with optional RAG enhancement.
-        
-        This is the core processing function that:
-        1. Checks if user has uploaded documents (RAG available)
-        2. If RAG: Retrieves relevant context and augments prompt
-        3. If no RAG: Uses standard prompt
-        4. Trims message history to fit context window
-        5. Invokes model and returns response
-        
-        Args:
-            state: Current conversation state with messages
-            config: RunnableConfig containing thread_id and other settings
-            
-        Returns:
-            Dictionary with updated messages list
-            
-        Note:
-            - RAG augmentation happens BEFORE model invocation
-            - Retrieved context is injected into the system prompt
-            - This allows model to "see" document content without fine-tuning
-            - Falls back gracefully if no documents are available
-        """
-        # ═══════════════════════════════════════════════════════════════
-        # STEP 1: Extract thread_id from config
-        # ═══════════════════════════════════════════════════════════════
-        thread_id = None
-        if config and "configurable" in config:
-            thread_id = config["configurable"].get("thread_id")
-        
-        print(f"🔧 call_model - config type: {type(config)}, has configurable: {'configurable' in config if config else False}")
-        if config:
-            print(f"🔧 call_model - config keys: {config.keys() if hasattr(config, 'keys') else 'N/A'}")
-            print(f"🔧 call_model - thread_id extracted: {thread_id}")
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STEP 2: Trim message history to fit context window
-        # ═══════════════════════════════════════════════════════════════
-        # This prevents "context length exceeded" errors
-        # Keeps recent messages and system prompt, discards old ones
-        trimmed_messages = self.trimmer.invoke(state["messages"])
-        
-        # Get the latest user message (the current query)
-        last_message = trimmed_messages[-1] if trimmed_messages else None
-        user_query = last_message.content if last_message and hasattr(last_message, "content") else ""
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STEP 3: Smart RAG Decision (NEW - Performance Optimization!)
-        # ═══════════════════════════════════════════════════════════════
-        # Instead of ALWAYS retrieving when docs exist, we intelligently
-        # decide if this specific query would benefit from RAG
-        should_retrieve = thread_id and self.should_use_rag(user_query, thread_id)
-        print(f"🔍 Should use RAG: {should_retrieve} (thread_id={thread_id})")
-        
-        if thread_id and thread_id in self.thread_vector_stores:
-            print(f"📚 Thread {thread_id[:8]} has documents in vector store")
-            print(f"🔍 Query: '{user_query[:100]}...' (should_use_rag={should_retrieve})")
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STEP 4: RAG Enhancement (only if deemed necessary)
-        # ═══════════════════════════════════════════════════════════════
-        if should_retrieve:
-            # Retrieve relevant document chunks
-            # Increased k=6 for better coverage of resume content
-            retrieved_docs = self.retrieve_context_for_query(thread_id, user_query, k=6)
-            
-            if retrieved_docs:
-                print(f"✓ RAG: Retrieved {len(retrieved_docs)} relevant document chunks")
-                # Format retrieved context for injection into prompt
-                context_text = "\n\n".join([
-                    f"[Document Excerpt {i+1}]:\n{doc.page_content}"
-                    for i, doc in enumerate(retrieved_docs)
-                ])
-                
-                # Create RAG-enhanced prompt template
-                # This is the KEY to RAG: we inject retrieved content into the prompt
-                rag_prompt = ChatPromptTemplate.from_messages([
-                    ("system", 
-                     "You are a helpful assistant. You have access to document excerpts that may be relevant to the user's question.\n\n"
-                     "RELEVANT DOCUMENT CONTEXT:\n"
-                     "═══════════════════════════════════════\n"
-                     f"{context_text}\n"
-                     "═══════════════════════════════════════\n\n"
-                     "Instructions:\n"
-                     "1. Use the document context above to answer questions when relevant\n"
-                     "2. If the context doesn't contain the answer, say so - don't make things up\n"
-                     "3. Cite which document excerpt you're using (e.g., 'According to Document Excerpt 1...')\n"
-                     "4. You can also use your general knowledge and available tools when appropriate\n\n"
-                     "Answer all questions to the best of your ability."),
-                    MessagesPlaceholder(variable_name="messages"),
-                ])
-                
-                prompt = rag_prompt.invoke({"messages": trimmed_messages})
-                print(f"✓ RAG: Augmented prompt with {len(retrieved_docs)} document excerpts")
-            else:
-                # No relevant documents found, use standard prompt
-                print("⚠️ RAG: No relevant documents retrieved despite should_retrieve=True")
-                prompt = self.prompt_template.invoke({"messages": trimmed_messages})
-        else:
-            # ═══════════════════════════════════════════════════════════════
-            # STEP 5: Standard prompt (no RAG)
-            # ═══════════════════════════════════════════════════════════════
-            if thread_id and thread_id in self.thread_vector_stores:
-                print(f"ℹ️ RAG: Skipped retrieval (query not deemed document-related)")
-            prompt = self.prompt_template.invoke({"messages": trimmed_messages})
-        
-        # ═══════════════════════════════════════════════════════════════
-        # STEP 6: Invoke model with (possibly augmented) prompt
-        # ═══════════════════════════════════════════════════════════════
-        response = await self.model_with_tools.ainvoke(prompt)
-        return {"messages": response}
-    
-    async def initialize(self) -> None:
-        """Initialize all components of the chatbot."""
-        print("Starting initialization...")
-        await self.initialize_mcp_client()
-        self.initialize_model()
-        self.create_workflow()
-        print("Initialization complete!")
-    
     def new_thread_config(self) -> Dict[str, Any]:
         """Generate a new thread configuration with unique ID."""
         return {"configurable": {"thread_id": str(uuid.uuid4())}}
@@ -766,32 +717,14 @@ class GeminiMCPChatbot:
                 print(response)
 
 
-def create_chatbot(config_file: str = "server_config_python_only.json", 
-                   model_name: str = "gemini-2.5-flash",
-                   timeout: float = 30.0) -> GeminiMCPChatbot:
-    """
-    Factory function to create a configured chatbot instance.
-    
-    Args:
-        config_file: MCP server configuration file
-        model_name: Gemini model to use
-        timeout: Timeout for MCP connections
-    
-    Returns:
-        Configured GeminiMCPChatbot instance
-    """
-    return GeminiMCPChatbot(
-        model_name=model_name,
-        config_file=config_file,
-        timeout=timeout
-    )
-
-
 async def main():
     """Main function to run the chatbot."""
-    chatbot = create_chatbot()
+    chatbot = GeminiMCPChatbot(
+        model_name="gemini-2.5-flash",
+        config_file="server_config_python_only.json",
+        timeout=30.0
+    )
     await chatbot.run_interactive_chat()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
