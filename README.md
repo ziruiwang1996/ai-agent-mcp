@@ -565,8 +565,6 @@ docker buildx build --platform linux/amd64 -t ai-agent:latest --load .  # For Ap
 
 ## License
 
-[Your License Here]
+MIT
 
 ---
-
-**Built with ❤️ for life science research**
