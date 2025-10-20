@@ -1,126 +1,82 @@
 # Life Science AI Agent
 
-A production-ready AI agent framework powered by Google Gemini and LangChain, integrated with Model Context Protocol (MCP) servers for enhanced research capabilities. Features include thread-scoped RAG (Retrieval Augmented Generation), document processing, and bounded thread caching for memory management.
-
----
+A production-ready AI agent powered by Google Gemini and LangChain, featuring Model Context Protocol (MCP) servers for research capabilities, thread-scoped RAG (Retrieval Augmented Generation), and intelligent memory management.
 
 ## Table of Contents
 
 - [Features](#features)
-- [Architecture](#architecture)
 - [Quick Start](#quick-start)
-- [API Documentation](#api-documentation)
-- [Thread & Memory Management](#thread--memory-management)
+- [API Reference](#api-reference)
 - [RAG System](#rag-system)
+- [Memory Management](#memory-management)
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
-- [Development Notes](#development-notes)
 
 ---
 
 ## Features
 
-### 🤖 **AI Capabilities**
-- **Gemini 2.5 Flash** integration via LangChain
-- **Agentic tool use** - Model autonomously decides when to use tools
-- **Streaming responses** for real-time interaction
-- **Thread-based conversation** history with context preservation
-
-### 🔧 **MCP Tool Integration**
-- **arXiv Server**: Search and retrieve academic papers
-- **OpenFDA Server**: Query drug and device data
-- **ClinicalTrials Server**: Access clinical trial information
-- **PDB Server**: Search protein structure database
-- **Extensible**: Easy to add more MCP servers
-
-### 📚 **RAG (Retrieval Augmented Generation)**
-- **Thread-scoped document storage** - Each conversation has isolated documents
-- **Smart retrieval decision** - Only retrieves when query is document-related
-- **Multi-format support** - PDF, TXT, DOCX, Markdown
-- **Automatic cleanup** - Documents removed when threads expire
-
-### 🧠 **Memory Management**
-- **Bounded Thread Cache** - LRU eviction prevents memory leaks
-- **Configurable capacity** - Adjust based on server resources
-- **Automatic cleanup callbacks** - Documents cleaned up on thread eviction
-- **Production-ready** for anonymous/unauthenticated environments
-
-### 🌐 **FastAPI Backend**
-- **RESTful API** with auto-generated docs
-- **CORS support** for web frontends
-- **Streaming endpoints** via Server-Sent Events
-- **Health monitoring** and statistics endpoints
+- **Gemini 2.5 Flash** with agentic tool use and streaming responses
+- **MCP Servers**: 4 specialized servers with 7 tools total
+  - arXiv: Search papers, get available folders, retrieve topic papers
+  - OpenFDA: Search drug and device information
+  - ClinicalTrials: Search clinical trial data
+  - PDB: Search protein structures, extract data, find similar sequences
+- **Thread-scoped RAG**: Upload and query documents per conversation
+- **Smart memory management**: LRU cache with configurable capacity (default: 50 threads)
+- **Multi-format support**: PDF, TXT, DOCX, Markdown
+- **RESTful API**: FastAPI with auto-generated docs and CORS support
 
 ---
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        FastAPI Server                       │
-│                    (main.py, routers/)                      │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-    ┌─────────┐  ┌─────────┐  ┌─────────┐
-    │  Chat   │  │Document │  │ Health  │
-    │ Router  │  │ Router  │  │ Router  │
-    └────┬────┘  └────┬────┘  └────┬────┘
-         │            │            │
-         └────────────┼────────────┘
-                      ▼
-         ┌────────────────────────┐
-         │  GeminiMCPChatbot      │
-         │  (langchain_client.py) │
-         └────┬───────────┬───────┘
-              │           │
-      ┌───────▼───┐   ┌───▼────────┐
-      │ LangGraph │   │ MCP Client │
-      │ Workflow  │   │  (Tools)   │
-      └───┬───────┘   └───┬────────┘
-          │               │
-      ┌───▼───────┐   ┌───▼─────────┐
-      │  Gemini   │   │ MCP Servers │
-      │   Model   │   │ (4 servers) │
-      └───────────┘   └─────────────┘
-                          │
-              ┌───────────┼───────────┐
-              ▼           ▼           ▼
-          ┌──────┐   ┌──────┐   ┌──────┐
-          │arXiv │   │ FDA  │   │ PDB  │
-          └──────┘   └──────┘   └──────┘
-```
-
-### Project Structure
+## Project Structure
 
 ```
 agent-server/
-├── main.py                          # FastAPI app entry point
+├── main.py                          # FastAPI app entry point & server configuration
 ├── requirements.txt                 # Python dependencies
-├── Dockerfile                       # Docker configuration
+├── Dockerfile                       # Docker container configuration
 ├── docker-entrypoint.sh            # Container startup script
+├── render.yaml                     # Render deployment configuration
+├── .env                            # Environment variables (create this)
 │
-├── client/
-│   ├── langchain_client.py         # GeminiMCPChatbot (core logic)
-│   ├── server_config.json          # MCP server configuration (dev)
-│   ├── server_config_production.json
+├── client/                         # LangChain chatbot core
+│   ├── langchain_client.py         # GeminiMCPChatbot class (main logic)
+│   ├── server_config.json          # MCP server config (development)
+│   ├── server_config_production.json # MCP server config (production/Docker)
 │   └── utils.py                    # Helper functions
 │
-├── host_app/
-│   ├── bounded_thread_cache.py     # LRU cache for threads
-│   └── routers/
-│       ├── chat.py                 # Chat endpoints
-│       └── document.py             # Document upload endpoints
+├── host_app/                       # FastAPI application
+│   ├── bounded_thread_cache.py     # LRU cache for thread management
+│   └── routers/                    # API endpoints
+│       ├── chat.py                 # Chat endpoints (/chat, /chat/stream, /chat/reset)
+│       └── document.py             # Document endpoints (/documents/*)
 │
-├── mcp-server/
-│   ├── arxiv_server.py             # Academic paper search
-│   ├── openfda_server.py           # FDA drug data
-│   ├── clinicaltrials_server.py   # Clinical trial data
-│   └── pdb_server.py               # Protein structure data
+├── mcp-server/                     # Model Context Protocol servers
+│   ├── arxiv_server.py             # Academic paper search (3 tools)
+│   ├── openfda_server.py           # FDA drug database (1 tool)
+│   ├── clinicaltrials_server.py   # Clinical trials data (1 tool)
+│   └── pdb_server.py               # Protein structure database (3 tools)
 │
-└── arxiv_papers/                   # Paper cache directory
+├── arxiv_papers/                   # Cached arXiv papers (created at runtime)
+│
+├── server-env/                     # Virtual environment (create with venv)
+│
+└── test/                           # Test files
+    ├── test_api.py
+    ├── test_rag.py
+    ├── test_rag_debug.py
+    └── check_thread_status.py
 ```
+
+### Key Files
+
+- **`main.py`**: Initializes FastAPI app, chatbot, thread cache, and routers
+- **`client/langchain_client.py`**: Core chatbot with MCP integration, RAG, and LangGraph workflow
+- **`host_app/bounded_thread_cache.py`**: LRU cache preventing memory leaks
+- **`host_app/routers/chat.py`**: Chat endpoints with streaming support
+- **`host_app/routers/document.py`**: Document upload/management for RAG
+- **`mcp-server/*.py`**: Independent MCP servers providing specialized tools
 
 ---
 
@@ -179,13 +135,23 @@ docker run -p 8000:8000 -e GEMINI_API_KEY=your_key ai-agent:latest
 
 ---
 
-## API Documentation
+## API Reference
 
-### Base URL
-- **Local**: `http://localhost:8000`
-- **Docker**: `http://localhost:8000`
+**Base URL:** `http://localhost:8000`
 
 ### Core Endpoints
+
+#### 0. Root
+```http
+GET /
+```
+
+**Response:**
+```json
+{
+  "message": "Hello, this is the Life Science Research Agent server with MCP tools."
+}
+```
 
 #### 1. Health Check
 ```http
@@ -239,6 +205,8 @@ Content-Type: application/json
 }
 ```
 
+**Note:** You can use either `"query"` or `"message"` field for the user input.
+
 **Response:**
 ```json
 {
@@ -269,7 +237,7 @@ data: {"type": "done"}
 
 #### 5. Upload Document
 ```http
-POST /document/upload
+POST /documents/upload
 Content-Type: multipart/form-data
 
 file: <file>
@@ -279,27 +247,43 @@ thread_id: abc123-def456-...
 **Response:**
 ```json
 {
-  "filename": "research_paper.pdf",
-  "num_chunks": 42,
-  "num_pages": 10,
-  "file_size": 245760,
-  "file_type": "PDF",
+  "message": "Document uploaded successfully",
+  "document": {
+    "filename": "research_paper.pdf",
+    "num_chunks": 42,
+    "num_pages": 10,
+    "file_size": 245760,
+    "file_type": "PDF"
+  },
   "thread_id": "abc123-def456-..."
 }
 ```
 
 #### 6. List Documents
 ```http
-GET /document/list?thread_id=abc123-def456-...
+GET /documents/list/{thread_id}
+```
+
+**Response:**
+```json
+{
+  "thread_id": "abc123-def456-...",
+  "documents": [...],
+  "count": 2
+}
 ```
 
 #### 7. Clear Documents
 ```http
-POST /document/clear
-Content-Type: application/json
+DELETE /documents/clear/{thread_id}
+```
 
+**Response:**
+```json
 {
-  "thread_id": "abc123-def456-..."
+  "thread_id": "abc123-def456-...",
+  "message": "Documents cleared successfully",
+  "documents_removed": 2
 }
 ```
 
@@ -313,6 +297,16 @@ Content-Type: application/json
 }
 ```
 
+**Response:**
+```json
+{
+  "thread_id": "new-abc123-...",
+  "message": "Chat thread reset",
+  "documents_cleared": true,
+  "cache_stats": {...}
+}
+```
+
 #### 9. Thread Statistics
 ```http
 GET /threads/stats
@@ -322,287 +316,149 @@ GET /threads/stats
 ```json
 {
   "cache_info": {
-    "current_threads": 45,
-    "max_threads": 100,
-    "utilization": "45.0%"
-  }
+    "current_threads": 23,
+    "max_threads": 50,
+    "utilization": "46.0%"
+  },
+  "message": "Thread cache statistics"
 }
 ```
 
 ### Usage Examples
 
-#### Python Client
+**Python:**
 ```python
 import requests
 
-# Start a conversation
-response = requests.post("http://localhost:8000/chat", json={
-    "query": "Search for papers about quantum computing"
-})
-data = response.json()
-thread_id = data['thread_id']
+response = requests.post("http://localhost:8000/chat", 
+    json={"query": "Search for papers about quantum computing"})
+thread_id = response.json()['thread_id']
 
-# Upload a document
+# Upload a document (note: /documents/ not /document/)
 with open("paper.pdf", "rb") as f:
-    requests.post(
-        f"http://localhost:8000/document/upload?thread_id={thread_id}",
-        files={"file": f}
-    )
+    files = {"file": f}
+    data = {"thread_id": thread_id}
+    requests.post("http://localhost:8000/documents/upload", files=files, data=data)
 
 # Ask about the document
-response = requests.post("http://localhost:8000/chat", json={
-    "query": "Summarize the uploaded paper",
-    "thread_id": thread_id
-})
+requests.post("http://localhost:8000/chat", 
+    json={"query": "Summarize the paper", "thread_id": thread_id})
 ```
 
-#### JavaScript/Node.js
-```javascript
-// Simple chat
-const response = await fetch('http://localhost:8000/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        query: 'What can you help me with?'
-    })
-});
-const data = await response.json();
-console.log(data.response);
-```
-
-#### cURL
+**cURL:**
 ```bash
-# Health check
 curl http://localhost:8000/health
-
-# Simple chat
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Hello!"}'
-
-# Upload document
-curl -X POST "http://localhost:8000/document/upload?thread_id=abc123" \
-  -F "file=@document.pdf"
+curl -X POST http://localhost:8000/chat -H "Content-Type: application/json" -d '{"query": "Hello!"}'
+curl -X POST http://localhost:8000/documents/upload -F "file=@document.pdf" -F "thread_id=abc123"
 ```
 
 ---
 
-## Thread & Memory Management
+## MCP Tools
 
-### Bounded Thread Cache
+The agent has access to 7 specialized tools across 4 MCP servers:
 
-The system uses an LRU (Least Recently Used) cache to prevent memory leaks in anonymous environments.
+### arXiv Server (3 tools)
+- **search_papers**: Search for academic papers by topic (returns up to 5 papers)
+- **get_available_folders**: List all cached paper topics
+- **get_topic_papers**: Retrieve papers for a specific cached topic
 
-#### How It Works
+### OpenFDA Server (1 tool)
+- **search_drug**: Search FDA database for drug and device information
+
+### ClinicalTrials Server (1 tool)
+- **search_clinical_trials**: Query clinical trials by condition, intervention, or other criteria
+
+### PDB Server (3 tools)
+- **search_pdb_ids**: Search for protein structures using text queries
+- **extract_pdb_data**: Get detailed data for a specific PDB ID
+- **search_similar_sequence**: Find protein structures with similar sequences (supports protein, DNA, RNA)
+
+The model **autonomously decides** when to use these tools based on user queries.
+
+---
+
+## Memory Management
+
+The system uses an LRU (Least Recently Used) cache to prevent memory leaks by limiting active threads.
+
+### Configuration
+
+Edit `main.py` to adjust capacity:
 
 ```python
-# In main.py
-from host_app.bounded_thread_cache import BoundedThreadCache
-
-def cleanup_thread_resources(thread_id: str):
-    """Called when thread is evicted."""
-    chatbot.clear_thread_documents(thread_id)
-
 thread_configs = BoundedThreadCache(
-    max_threads=100,
+    max_threads=50,  # Current default, adjust based on server resources
     cleanup_callback=cleanup_thread_resources
 )
 ```
 
-#### Key Features
+**Capacity Guidelines:**
 
-1. **Fixed Capacity** - Maximum number of active threads
-2. **LRU Eviction** - Oldest/least-used threads removed first
-3. **Automatic Cleanup** - Documents deleted when thread evicted
-4. **Statistics** - Monitor cache usage via `/threads/stats`
+| Max Threads | Use Case | Memory |
+|-------------|----------|--------|
+| 50 | Default, small-medium server | ~10-50 MB |
+| 100 | Medium traffic | ~20-100 MB |
+| 200 | High traffic | ~40-200 MB |
 
-#### Capacity Guidelines
-
-| Max Threads | Use Case | Memory Impact |
-|-------------|----------|---------------|
-| 50 | Small server, low traffic | ~10-50 MB |
-| 100 | Default, balanced | ~20-100 MB |
-| 200 | Medium traffic | ~40-200 MB |
-| 500 | High traffic, lots of RAM | ~100-500 MB |
-
-#### Configuration
-
-```python
-# Adjust in main.py based on your server:
-thread_configs = BoundedThreadCache(
-    max_threads=100,  # Change this value
-    cleanup_callback=cleanup_thread_resources
-)
-```
-
-#### Monitoring
+### Monitoring
 
 ```bash
-# Check cache statistics
 curl http://localhost:8000/threads/stats
-
-# Watch in real-time
 watch -n 5 'curl -s http://localhost:8000/threads/stats | jq'
 ```
 
-### When Threads Are Evicted
-
-```
-🗑️  Evicted oldest thread: abc12345... (cache full)
-✓ Cleared documents for evicted thread: abc12345...
-```
-
-**Important**: Users should save important conversation history client-side, as threads can be evicted when the cache is full.
+**Note:** Threads are evicted when cache is full. Save important conversations client-side.
 
 ---
 
 ## RAG System
 
-### Overview
-
-The RAG (Retrieval Augmented Generation) system allows the chatbot to answer questions about uploaded documents.
-
-### Supported Formats
-
-- **PDF** - Parsed page-by-page
-- **TXT** - Plain text files
-- **DOCX** - Microsoft Word documents
-- **MD** - Markdown files
+Upload documents (PDF, TXT, DOCX, MD) and ask questions about them. Each thread has isolated document storage.
 
 ### How It Works
 
-1. **Document Upload** → Split into chunks → Create embeddings → Store in vector DB
-2. **Query** → Smart decision: "Is this about documents?" → Retrieve relevant chunks
-3. **Response** → Inject document context into prompt → Model answers with context
+1. Upload → Split into chunks → Create embeddings → Store in vector DB
+2. Query → Smart decision: "Is this document-related?" → Retrieve relevant chunks
+3. Generate → Inject context into prompt → Model answers with document context
 
-### Smart Retrieval Decision
+### Smart Retrieval
 
-The system intelligently decides when to use RAG:
+The system automatically detects document-related queries:
 
-```python
-# Triggers RAG:
-"Tell me about my work at Company X"  # ✅ Document keywords
-"Summarize the uploaded paper"        # ✅ Document reference
-"What does my resume say about..."    # ✅ Personal document
+**Triggers RAG:**
+- "Summarize the uploaded paper"
+- "What does my resume say about..."
+- "According to the document..."
 
-# Skips RAG:
-"Hello!"                              # ❌ Greeting
-"Search arXiv for papers"             # ❌ Tool request
-"What's the weather?"                 # ❌ No document keywords
-```
+**Skips RAG:**
+- "Hello!"
+- "Search arXiv for papers" (uses MCP tools instead)
 
 ### Configuration
 
-```python
-# In client/langchain_client.py
-def add_document_to_thread(self, ...):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,      # Characters per chunk
-        chunk_overlap=200,    # Overlap for context
-        add_start_index=True
-    )
-```
-
-**Tuning Guidelines:**
-- **Smaller chunks (800)** = More precise, less context
-- **Larger chunks (1500)** = More context, less precise
-- **More overlap (300)** = Better continuity, more storage
-
-### Retrieval Count
+Edit `client/langchain_client.py`:
 
 ```python
-# In client/langchain_client.py
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,      # Characters per chunk
+    chunk_overlap=200     # Overlap for context
+)
+
 retrieved_docs = self.retrieve_context_for_query(thread_id, query, k=4)
 ```
 
-- **k=4** - Default, balanced
-- **k=6-8** - For complex documents (resumes, research papers)
-- **k=2-3** - For simple documents (short memos)
-
-### Document Keywords
-
-The system recognizes these keywords for RAG triggering:
-
-```python
-document_keywords = [
-    "document", "paper", "article", "file", "uploaded",
-    "resume", "cv", "work experience", "responsibilities",
-    "according to", "based on", "mentioned", "states",
-    "summarize", "summary", "explain", "section", "page"
-]
-```
-
-### Debugging RAG
-
-Look for these logs:
-
-**✅ RAG Working:**
-```
-📚 Thread abc12345 has documents in vector store
-🔍 Query: 'tell me about my resume...' (should_use_rag=True)
-✓ RAG: Retrieved 6 relevant document chunks
-✓ RAG: Augmented prompt with 6 document excerpts
-```
-
-**⚠️ RAG Issues:**
-```
-⚠️ Vector store exists for thread abc12345 but store is empty
-⚠️ RAG: No relevant documents retrieved despite should_retrieve=True
-ℹ️ RAG: Skipped retrieval (query not deemed document-related)
-```
-
-### Empty Vector Store Check
-
-The system detects when a vector store exists but has no documents:
-
-```python
-# Two-level checking:
-# 1. Check internal store attribute
-if hasattr(vector_store, 'store') and len(vector_store.store) == 0:
-    return False
-
-# 2. Check document metadata
-if thread_id not in self.thread_documents or len(self.thread_documents[thread_id]) == 0:
-    return False
-```
+**Tuning:**
+- Chunk size: 800 (precise) to 1500 (more context)
+- Retrieval count (k): 2-3 (simple docs) to 6-8 (complex docs)
 
 ### Common Issues
 
-#### Issue 1: "I cannot access documents"
-**Solution**: Make sure you're using the same `thread_id` for upload and chat.
+**Documents not found:**
+- Ensure you use the same `thread_id` for upload and queries
 
-```python
-# ✅ Correct
-thread_id = "abc123"
-upload_document(thread_id, file)
-chat(thread_id, "Tell me about the document")
-
-# ❌ Wrong
-upload_document("thread-1", file)
-chat("thread-2", "Tell me about the document")  # Different thread!
-```
-
-#### Issue 2: No relevant documents retrieved
-**Solution**: Use more specific keywords from your document.
-
-```python
-# Instead of:
-"Tell me about the company"  # Too vague
-
-# Try:
-"What does my resume say about my work at Company X?"  # Specific
-```
-
-#### Issue 3: RAG not triggering
-**Solution**: Use document-related keywords.
-
-```python
-# Instead of:
-"What did I do?"  # No document keywords
-
-# Try:
-"Based on my uploaded resume, what did I do?"  # Has keywords
-```
+**RAG not triggering:**
+- Use document keywords: "summarize", "according to", "uploaded", "document"
 
 ---
 
@@ -616,310 +472,100 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 ### Docker
 
-1. **Build the image:**
-   ```bash
-   docker build -t ai-agent:latest .
-   ```
-
-2. **Run the container:**
-   ```bash
-   docker run -p 8000:8000 \
-     -e GEMINI_API_KEY=your_key \
-     ai-agent:latest
-   ```
+```bash
+docker build -t ai-agent:latest .
+docker run -p 8000:8000 -e GEMINI_API_KEY=your_key ai-agent:latest
+```
 
 ### Docker Hub + Render
 
-1. **Build for multiple platforms:**
-   ```bash
-   docker buildx create --name mybuilder --use
-   docker buildx build \
-     --platform linux/amd64,linux/arm64 \
-     -t yourusername/ai-agent:latest \
-     --push .
-   ```
+```bash
+# Build multi-platform image
+docker buildx create --name mybuilder --use
+docker buildx build --platform linux/amd64,linux/arm64 -t yourusername/ai-agent:latest --push .
+```
 
-2. **Deploy on Render:**
-   - Create new Web Service
-   - Select "Deploy existing image from registry"
-   - Image: `yourusername/ai-agent:latest`
-   - Add environment variable: `GEMINI_API_KEY`
-   - Deploy!
+On Render:
+1. Create new Web Service
+2. Select "Deploy existing image from registry"
+3. Image: `yourusername/ai-agent:latest`
+4. Add environment variable: `GEMINI_API_KEY`
 
-3. **Update deployment:**
-   ```bash
-   docker build -t yourusername/ai-agent:latest .
-   docker push yourusername/ai-agent:latest
-   # Render will auto-deploy or manually trigger
-   ```
+### Production Checklist
 
-### Production Considerations
-
-- **Environment Variables**: Use secrets management
-- **CORS**: Restrict origins in production
-- **Rate Limiting**: Add rate limiting middleware
-- **Authentication**: Implement user auth
-- **Monitoring**: Add logging and metrics
-- **HTTPS**: Use TLS/SSL certificates
-- **Scaling**: Consider horizontal scaling
+- Use secrets management for API keys
+- Restrict CORS origins
+- Add rate limiting
+- Implement authentication
+- Enable HTTPS
+- Configure logging and monitoring
 
 ---
 
 ## Troubleshooting
 
-### Circular Import Error
+### MCP Servers Not Starting
 
-**Symptom:**
-```
-ImportError: cannot import name 'chatbot' from partially initialized module 'main'
+Check health endpoint shows `tools_available: 0`:
+
+```bash
+ls -la mcp-server/*.py  # Verify files exist
+python3 mcp-server/arxiv_server.py  # Test individual server
 ```
 
-**Solution:** Use dependency injection pattern:
+Verify `client/server_config.json` paths are correct.
+
+### Documents Not Found
+
+Always use the same `thread_id` for upload and queries:
 
 ```python
-# In routers/chat.py
-chatbot = None
-thread_configs = None
-
-def set_dependencies(chatbot_instance, thread_configs_instance):
-    global chatbot, thread_configs
-    chatbot = chatbot_instance
-    thread_configs = thread_configs_instance
-
-# In main.py (after creating objects)
-from host_app.routers import chat, document
-
-chat.set_dependencies(chatbot, thread_configs)
-document.set_dependencies(chatbot)
-
-app.include_router(chat.router)
-app.include_router(document.router)
-```
-
-### Infinite Tool Calling Loop
-
-**Symptom:** Server hangs, logs show repeated `CallToolRequest`.
-
-**Solution:** Add recursion limit:
-
-```python
-# In routers/chat.py
-config["recursion_limit"] = 25
-
-output = await asyncio.wait_for(
-    chatbot.app.ainvoke({"messages": [...]}, config),
-    timeout=120.0
-)
-```
-
-### Thread ID Issues
-
-**Symptom:** `thread_id=None` in logs, documents not found.
-
-**Solution:** Always use the same thread_id for upload and chat:
-
-```python
-# 1. Create or get thread_id
 response = requests.post("http://localhost:8000/chat", json={"query": "hi"})
 thread_id = response.json()['thread_id']
 
-# 2. Upload with same thread_id
-requests.post(
-    f"http://localhost:8000/document/upload?thread_id={thread_id}",
-    files={"file": open("doc.pdf", "rb")}
-)
-
-# 3. Chat with same thread_id
-requests.post("http://localhost:8000/chat", json={
-    "query": "Tell me about the document",
-    "thread_id": thread_id  # SAME ID!
-})
+# Use this thread_id for both upload and chat (note: /documents/ not /document/)
+files = {"file": open("doc.pdf", "rb")}
+data = {"thread_id": thread_id}
+requests.post("http://localhost:8000/documents/upload", files=files, data=data)
+requests.post("http://localhost:8000/chat", json={"thread_id": thread_id, "query": "..."})
 ```
 
-### MCP Servers Not Starting
+### Server Hangs / Infinite Loop
 
-**Symptom:** `tools_available: 0` in health check.
+The code already has protection with recursion limit (25) and timeout (60s) in `routers/chat.py`:
 
-**Solution:**
-
-1. Check server configuration:
-   ```python
-   # client/server_config.json
-   {
-     "mcpServers": {
-       "arxiv_server": {
-         "command": "python3",
-         "args": ["mcp-server/arxiv_server.py"]  # Correct path?
-       }
-     }
-   }
-   ```
-
-2. Verify MCP server files exist:
-   ```bash
-   ls -la mcp-server/*.py
-   ```
-
-3. Test individual server:
-   ```bash
-   python3 mcp-server/arxiv_server.py
-   ```
-
-### Docker Build Issues
-
-**Symptom:** Build fails or image doesn't run.
-
-**Solutions:**
-
-```bash
-# Clear cache and rebuild
-docker build --no-cache -t ai-agent:latest .
-
-# For multi-platform (Apple Silicon → Cloud)
-docker buildx build \
-  --platform linux/amd64 \
-  -t ai-agent:latest \
-  --load .
-
-# Check logs
-docker logs <container-id>
+```python
+config["recursion_limit"] = 25
+output = await asyncio.wait_for(chatbot.app.ainvoke(...), timeout=60.0)
 ```
+
+If issues persist, reduce recursion_limit to 15 or increase timeout to 90.0.
 
 ### Memory Issues
 
-**Symptom:** Server runs out of memory, crashes.
-
-**Solutions:**
-
-1. Reduce thread cache size:
-   ```python
-   thread_configs = BoundedThreadCache(max_threads=50)  # Lower
-   ```
-
-2. Monitor cache utilization:
-   ```bash
-   watch -n 5 'curl -s http://localhost:8000/threads/stats'
-   ```
-
-3. Implement aggressive cleanup:
-   ```python
-   # Clear threads older than 30 minutes
-   # (Custom implementation needed)
-   ```
-
----
-
-## Development Notes
-
-### Debugging Configuration Passing
-
-If `thread_id` is not reaching `call_model`:
+Reduce thread cache size in `main.py`:
 
 ```python
-# Add debug logging
-print(f"Config being passed: {config}")
-print(f"Config type: {type(config)}")
-print(f"Config keys: {config.keys() if hasattr(config, 'keys') else 'N/A'}")
+thread_configs = BoundedThreadCache(max_threads=50)
 ```
 
-Look for:
-- Config type (dict vs RunnableConfig)
-- Presence of "configurable" key
-- thread_id value
+Monitor usage:
+```bash
+watch -n 5 'curl -s http://localhost:8000/threads/stats'
+```
 
-### Architecture Decisions
-
-#### Why Bounded Cache?
-- Anonymous users create threads indefinitely
-- Prevents memory leaks
-- LRU eviction is fair and predictable
-
-#### Why Thread-Scoped RAG?
-- User privacy (documents isolated per thread)
-- Automatic cleanup (when thread evicted)
-- No cross-user document leakage
-
-#### Why Dependency Injection for Routers?
-- Breaks circular import
-- Testable in isolation
-- Follows SOLID principles
-
-#### Why Smart RAG Triggering?
-- Saves ~100-300ms per query
-- Prevents unnecessary embeddings
-- Better UX (faster non-RAG responses)
-
-### Testing
+### Docker Build Fails
 
 ```bash
-# Health check
-curl http://localhost:8000/health
-
-# Simple chat
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Hello!"}'
-
-# Upload document
-curl -X POST "http://localhost:8000/document/upload?thread_id=test-123" \
-  -F "file=@test.pdf"
-
-# Test RAG
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Summarize the uploaded document",
-    "thread_id": "test-123"
-  }'
+docker build --no-cache -t ai-agent:latest .
+docker buildx build --platform linux/amd64 -t ai-agent:latest --load .  # For Apple Silicon
 ```
-
-### Configuration Files
-
-- **`server_config.json`** - Development (local paths)
-- **`server_config_production.json`** - Production (Docker paths)
-- **`.env`** - API keys and secrets (never commit!)
-
-### Performance Tuning
-
-**Thread Cache:**
-- More threads = More memory, better UX
-- Fewer threads = Less memory, frequent evictions
-
-**RAG:**
-- Larger chunks = More context, less precise
-- More chunks (k) = Better recall, slower
-- More overlap = Better continuity, more storage
-
-**Model:**
-- `gemini-2.5-flash` - Fast, cheap, good quality
-- `gemini-2.0-pro` - Slower, more expensive, better quality
 
 ---
 
 ## License
 
 [Your License Here]
-
-## Contributors
-
-[Your Name/Team]
-
-## Acknowledgments
-
-- **LangChain** - AI framework
-- **LangGraph** - Workflow orchestration
-- **FastAPI** - Web framework
-- **Google Gemini** - LLM
-- **MCP (Model Context Protocol)** - Tool integration standard
-
----
-
-## Support
-
-For issues, questions, or contributions:
-- GitHub Issues: [Your repo URL]
-- Documentation: [Your docs URL]
-- Email: [Your email]
 
 ---
 
