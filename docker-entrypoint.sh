@@ -3,9 +3,10 @@
 # Exit on any error
 set -e
 
-# Check if GEMINI_API_KEY is provided as an environment variable
-if [ -z "${GEMINI_API_KEY}" ]; then
-    echo "Error: GEMINI_API_KEY environment variable is not set."
+# Require GOOGLE_API_KEY (used by google_genai).
+API_KEY="${GOOGLE_API_KEY}"
+if [ -z "${API_KEY}" ]; then
+    echo "Error: GOOGLE_API_KEY must be set."
     exit 1
 fi
 
@@ -15,17 +16,13 @@ export APP_PATH="/app"
 
 # Add API key and environment variables to .env file
 cat > .env << EOF
-GEMINI_API_KEY=${GEMINI_API_KEY}
+GOOGLE_API_KEY=${API_KEY}
 PYTHON_PATH=${PYTHON_PATH}
 APP_PATH=${APP_PATH}
 EOF
 
-# Create arxiv_papers directory if it doesn't exist
-mkdir -p /app/arxiv_papers
-
-# Verify MCP server files exist
 echo "Checking MCP server files..."
-ls -la /app/mcp-server/
+ls -la /app/mcp_servers/
 
 # Test Python path
 echo "Python executable: $(which python3)"
@@ -33,7 +30,7 @@ echo "Python version: $(python3 --version)"
 
 # Test MCP server files can be executed
 echo "Testing MCP server files..."
-for server in /app/mcp-server/*.py; do
+for server in /app/mcp_servers/*.py; do
     if [ -f "$server" ]; then
         echo "Testing $server..."
         python3 -m py_compile "$server" && echo "✓ $server compiles" || echo "✗ $server has syntax errors"

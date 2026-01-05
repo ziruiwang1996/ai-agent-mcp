@@ -1,0 +1,74 @@
+{
+    "label_interpreter_agent": {
+        "drug_label": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/drug_label_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "shared_tool": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/shared_tool_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        }
+    },
+
+    "FAERS_summarizer_agent": {
+        "adverse_event": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/adverse_event_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "shared_tool": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/shared_tool_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        }
+    },
+
+    "chat_agent": {
+        "pubmed": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/pubmed_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "drug_label": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/drug_label_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "adverse_event": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/adverse_event_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "shared_tool": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/shared_tool_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        }
+    }
+}

@@ -1,4 +1,4 @@
-# Life Science AI Agent
+# Med Helper
 
 A production-ready AI agent powered by Google Gemini and LangChain, featuring Model Context Protocol (MCP) servers for research capabilities, thread-scoped RAG (Retrieval Augmented Generation), and intelligent memory management.
 
@@ -49,10 +49,10 @@ agent-server/
 ├── host_app/                       # FastAPI application
 │   ├── bounded_thread_cache.py     # LRU cache for thread management
 │   └── routers/                    # API endpoints
-│       ├── chat.py                 # Chat endpoints (/chat, /chat/stream, /chat/reset)
-│       └── document.py             # Document endpoints (/documents/*)
+│       ├── chat.py                 # Chat endpoints (/api/chat/*)
+│       └── document.py             # Document endpoints (/api/chat/documents/*)
 │
-├── mcp-server/                     # Model Context Protocol servers
+├── mcp_servers/                    # Model Context Protocol servers
 │   ├── arxiv_server.py             # Academic paper search (3 tools)
 │   ├── openfda_server.py           # FDA drug database (1 tool)
 │   ├── clinicaltrials_server.py   # Clinical trials data (1 tool)
@@ -76,7 +76,7 @@ agent-server/
 - **`host_app/bounded_thread_cache.py`**: LRU cache preventing memory leaks
 - **`host_app/routers/chat.py`**: Chat endpoints with streaming support
 - **`host_app/routers/document.py`**: Document upload/management for RAG
-- **`mcp-server/*.py`**: Independent MCP servers providing specialized tools
+- **`mcp_servers/*.py`**: Independent MCP servers providing specialized tools
 
 ---
 
@@ -111,7 +111,7 @@ agent-server/
    
    Create a `.env` file:
    ```env
-   GEMINI_API_KEY=your-gemini-api-key-here
+  GOOGLE_API_KEY=your-gemini-api-key-here
    ```
 
 5. **Run the server**
@@ -123,6 +123,16 @@ agent-server/
    
    Open http://localhost:8000/docs for interactive API documentation
 
+7. **Initialize chat (on-demand)**
+
+  Med Helper does not initialize the chat agent at server startup. Call:
+  ```bash
+  curl -X POST http://localhost:8000/api/chat/initialize \
+    -H "Content-Type: application/json" \
+    -d '{"thread_id": ""}'
+  ```
+  Then use `/api/chat/batch` or `/api/chat/stream` with the returned `thread_id`.
+
 ### Docker Deployment
 
 ```bash
@@ -130,7 +140,7 @@ agent-server/
 docker build -t ai-agent:latest .
 
 # Run the container
-docker run -p 8000:8000 -e GEMINI_API_KEY=your_key ai-agent:latest
+docker run -p 8000:10000 -e GOOGLE_API_KEY=your_key ai-agent:latest
 ```
 
 ---
@@ -138,6 +148,8 @@ docker run -p 8000:8000 -e GEMINI_API_KEY=your_key ai-agent:latest
 ## API Reference
 
 **Base URL:** `http://localhost:8000`
+
+Note: Most API routes are namespaced under `/api`.
 
 ### Core Endpoints
 
@@ -149,7 +161,7 @@ GET /
 **Response:**
 ```json
 {
-  "message": "Hello, this is the Life Science Research Agent server with MCP tools."
+  "message": "Hello, this is the Med Helper server."
 }
 ```
 
@@ -174,7 +186,7 @@ GET /health
 
 #### 2. Available Tools
 ```http
-GET /tools
+GET /api/tools
 ```
 
 **Response:**
@@ -196,16 +208,16 @@ GET /tools
 
 #### 3. Simple Chat
 ```http
-POST /chat
+POST /api/chat/batch
 Content-Type: application/json
 
 {
-  "query": "Find papers about CRISPR gene editing",
-  "thread_id": "optional-thread-id"
+  "message": "Find papers about CRISPR gene editing",
+  "thread_id": "<thread_id from /api/chat/initialize>"
 }
 ```
 
-**Note:** You can use either `"query"` or `"message"` field for the user input.
+**Note:** Initialize chat first via `POST /api/chat/initialize`.
 
 **Response:**
 ```json
@@ -217,12 +229,12 @@ Content-Type: application/json
 
 #### 4. Streaming Chat
 ```http
-POST /chat/stream
+POST /api/chat/stream
 Content-Type: application/json
 
 {
-  "query": "Explain machine learning in drug discovery",
-  "thread_id": "optional-thread-id"
+  "message": "Explain machine learning in drug discovery",
+  "thread_id": "<thread_id from /api/chat/initialize>"
 }
 ```
 
@@ -237,7 +249,7 @@ data: {"type": "done"}
 
 #### 5. Upload Document
 ```http
-POST /documents/upload
+POST /api/chat/documents/upload
 Content-Type: multipart/form-data
 
 file: <file>
@@ -261,7 +273,7 @@ thread_id: abc123-def456-...
 
 #### 6. List Documents
 ```http
-GET /documents/list/{thread_id}
+GET /api/chat/documents/list/{thread_id}
 ```
 
 **Response:**
@@ -275,7 +287,7 @@ GET /documents/list/{thread_id}
 
 #### 7. Clear Documents
 ```http
-DELETE /documents/clear/{thread_id}
+DELETE /api/chat/documents/clear/{thread_id}
 ```
 
 **Response:**
@@ -289,7 +301,7 @@ DELETE /documents/clear/{thread_id}
 
 #### 8. Reset Thread
 ```http
-POST /chat/reset
+POST /api/chat/reset
 Content-Type: application/json
 
 {
@@ -330,26 +342,36 @@ GET /threads/stats
 ```python
 import requests
 
-response = requests.post("http://localhost:8000/chat", 
-    json={"query": "Search for papers about quantum computing"})
-thread_id = response.json()['thread_id']
+# Initialize chat and get a thread_id
+init = requests.post(
+    "http://localhost:8000/api/chat/initialize",
+    json={"thread_id": ""},
+)
+thread_id = init.json()["thread_id"]
+
+# Chat
+requests.post(
+    "http://localhost:8000/api/chat/batch",
+    json={"message": "Search for papers about quantum computing", "thread_id": thread_id},
+)
 
 # Upload a document (note: /documents/ not /document/)
 with open("paper.pdf", "rb") as f:
     files = {"file": f}
     data = {"thread_id": thread_id}
-    requests.post("http://localhost:8000/documents/upload", files=files, data=data)
+  requests.post("http://localhost:8000/api/chat/documents/upload", files=files, data=data)
 
 # Ask about the document
-requests.post("http://localhost:8000/chat", 
-    json={"query": "Summarize the paper", "thread_id": thread_id})
+requests.post("http://localhost:8000/api/chat/batch", 
+  json={"message": "Summarize the paper", "thread_id": thread_id})
 ```
 
 **cURL:**
 ```bash
 curl http://localhost:8000/health
-curl -X POST http://localhost:8000/chat -H "Content-Type: application/json" -d '{"query": "Hello!"}'
-curl -X POST http://localhost:8000/documents/upload -F "file=@document.pdf" -F "thread_id=abc123"
+curl -X POST http://localhost:8000/api/chat/initialize -H "Content-Type: application/json" -d '{"thread_id": ""}'
+curl -X POST http://localhost:8000/api/chat/batch -H "Content-Type: application/json" -d '{"message": "Hello!", "thread_id": "<thread_id>"}'
+curl -X POST http://localhost:8000/api/chat/documents/upload -F "file=@document.pdf" -F "thread_id=<thread_id>"
 ```
 
 ---
@@ -474,7 +496,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 ```bash
 docker build -t ai-agent:latest .
-docker run -p 8000:8000 -e GEMINI_API_KEY=your_key ai-agent:latest
+docker run -p 8000:8000 -e GOOGLE_API_KEY=your_key ai-agent:latest
 ```
 
 ### Docker Hub + Render
@@ -489,7 +511,7 @@ On Render:
 1. Create new Web Service
 2. Select "Deploy existing image from registry"
 3. Image: `yourusername/ai-agent:latest`
-4. Add environment variable: `GEMINI_API_KEY`
+4. Add environment variable: `GOOGLE_API_KEY` (preferred)
 
 ### Production Checklist
 
@@ -509,25 +531,25 @@ On Render:
 Check health endpoint shows `tools_available: 0`:
 
 ```bash
-ls -la mcp-server/*.py  # Verify files exist
-python3 mcp-server/arxiv_server.py  # Test individual server
+ls -la mcp_servers/*.py  # Verify files exist
+python3 -m py_compile mcp_servers/*.py  # Quick syntax check
 ```
 
-Verify `client/server_config.json` paths are correct.
+Verify `mcp_servers/mcp_server_config.json` paths are correct.
 
 ### Documents Not Found
 
 Always use the same `thread_id` for upload and queries:
 
 ```python
-response = requests.post("http://localhost:8000/chat", json={"query": "hi"})
-thread_id = response.json()['thread_id']
+init = requests.post("http://localhost:8000/api/chat/initialize", json={"thread_id": ""})
+thread_id = init.json()["thread_id"]
 
 # Use this thread_id for both upload and chat (note: /documents/ not /document/)
 files = {"file": open("doc.pdf", "rb")}
 data = {"thread_id": thread_id}
-requests.post("http://localhost:8000/documents/upload", files=files, data=data)
-requests.post("http://localhost:8000/chat", json={"thread_id": thread_id, "query": "..."})
+requests.post("http://localhost:8000/api/chat/documents/upload", files=files, data=data)
+requests.post("http://localhost:8000/api/chat/batch", json={"thread_id": thread_id, "message": "..."})
 ```
 
 ### Server Hangs / Infinite Loop

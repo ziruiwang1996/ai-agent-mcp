@@ -10,6 +10,30 @@ import time
 # API base URL
 BASE_URL = "http://localhost:8000"
 
+def test_label_interpretation():
+    data = {
+        "drug_name": "NAPROXEN",
+        "section": "indications_and_usage",
+        "content": """Naproxen tablets and naproxen sodium tablets are indicated for: the relief of the signs and symptoms of: 
+        • rheumatoid arthritis • osteoarthritis • ankylosing spondylitis • Polyarticular Juvenile Idiopathic Arthritis Naproxen 
+        tablets and naproxen sodium tablets are also indicated for: the relief of signs and symptoms of: • tendonitis • bursitis 
+        • acute gout the management of: • pain • primary dysmenorrhea Naproxen tablets and naproxen sodium tablets are non-steroidal 
+        anti-inflammatory drugs indicated for: the relief of the signs and symptoms of: • rheumatoid arthritis • osteoarthritis • 
+        ankylosing spondylitis • polyarticular juvenile idiopathic arthritis Naproxen tablets and naproxen sodium tablets are also 
+        indicated for: the relief of signs and symptoms of: • tendonitis • bursitis • acute gout the management of: • pain • primary dysmenorrhea"""
+    }
+    print("🧪 Testing label interpretation endpoint...")
+    response = requests.post(f"{BASE_URL}/interpretation", json=data)
+    print(f"Status: {response.status_code}")
+    if response.status_code == 200:
+        result = response.json()
+        print(f"Drug Name: {result['drug_name']}")
+        print(f"Section: {result['section']}")
+        print(f"Interpretation: {result['interpretation'][:500]}...")  # Truncate long interpretations
+    else:
+        print(f"Error: {response.text}")
+
+
 def test_health_check():
     """Test the health check endpoint."""
     print("🔍 Testing health check...")
@@ -24,9 +48,19 @@ def test_available_tools():
     response = requests.get(f"{BASE_URL}/tools")
     print(f"Status: {response.status_code}")
     data = response.json()
-    print(f"Tools available: {data['tools_count']}")
-    for tool in data['tools']:
-        print(f"  - {tool['name']}: {tool['description']}")
+    agents = data.get("agents", {})
+    for agent_name, info in agents.items():
+        print(f"Agent: {agent_name} (initialized={info.get('initialized')})")
+        for tool in info.get("tools", []):
+            print(f"  - {tool.get('name')}: {tool.get('description')}")
+    print()
+
+
+def initialize_chat():
+    print("⚙️  Initializing chat agent...")
+    response = requests.post(f"{BASE_URL}/chat/initialize")
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}")
     print()
 
 def test_simple_chat():
@@ -116,6 +150,9 @@ def main():
         # Test basic endpoints
         test_health_check()
         test_available_tools()
+
+        # Chat must be initialized on-demand
+        initialize_chat()
         
         # Test chat functionality
         thread_id = test_simple_chat()
@@ -136,4 +173,5 @@ def main():
         print(f"❌ Error during testing: {e}")
 
 if __name__ == "__main__":
-    main()
+    # main()
+    test_label_interpretation()

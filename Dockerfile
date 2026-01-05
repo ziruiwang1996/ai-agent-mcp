@@ -8,9 +8,6 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Create required directories
-RUN mkdir -p /app/arxiv_papers/computer_vision
-
 # Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -19,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Make MCP server files executable
-RUN chmod +x /app/mcp-server/*.py
+RUN chmod +x /app/mcp_servers/*.py
 
 # Expose port that Render will use
 EXPOSE 10000

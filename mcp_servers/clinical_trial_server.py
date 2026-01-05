@@ -1,7 +1,7 @@
 import requests
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("ClinicalTrials")
+mcp = FastMCP("clinical_trial")
 
 @mcp.tool()
 def search_clinical_trials(

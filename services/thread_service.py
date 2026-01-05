@@ -1,30 +1,28 @@
 from collections import OrderedDict
 from typing import Optional, Dict, Any, Callable
-from client.langchain_client import GeminiMCPChatbot
 
-def cleanup_thread_resources(thread_id: str, chatbot: GeminiMCPChatbot):
+class _ThreadDocumentCleaner:
+    def clear_thread_documents(self, thread_id: str) -> None:
+        ...
+
+def cleanup_thread_resources(thread_id: str, cleaner: _ThreadDocumentCleaner):
     """
     Cleanup callback for evicted threads.
-    
     This function is called automatically when a thread is evicted from cache.
     It cleans up all associated resources (documents, vector stores, etc.).
-    
-    Args:
-        thread_id: ID of the thread being evicted
     """
     try:
-        chatbot.clear_thread_documents(thread_id)
+        cleaner.clear_thread_documents(thread_id)
         print(f"Cleared documents for evicted thread: {thread_id[:8]}...")
     except Exception as e:
         print(f"Error clearing documents: {e}")
 
 """
-Bounded Thread Cache - Reusable LRU Cache Implementation
-
+Thread Service - Reusable LRU Cache Implementation
 A generic LRU (Least Recently Used) cache for managing thread configurations
 with automatic eviction and optional resource cleanup.
 """
-class BoundedThreadCache:
+class ThreadService:
     """
     LRU (Least Recently Used) cache for thread configurations.
     
@@ -42,7 +40,7 @@ class BoundedThreadCache:
     Example Usage:
     
         # Basic usage without cleanup
-        cache = BoundedThreadCache(max_threads=100)
+        cache = ThreadService(max_threads=100)
         cache.set("thread-1", {"config": "value"})
         config = cache.get("thread-1")
         
@@ -52,7 +50,7 @@ class BoundedThreadCache:
             database.delete_thread(thread_id)
             storage.clear_files(thread_id)
         
-        cache = BoundedThreadCache(
+        cache = ThreadService(
             max_threads=100,
             cleanup_callback=cleanup
         )
@@ -69,16 +67,6 @@ class BoundedThreadCache:
         max_threads: int = 100,
         cleanup_callback: Optional[Callable[[str], None]] = None
     ):
-        """
-        Initialize the bounded cache.
-        
-        Args:
-            max_threads: Maximum number of threads (must be > 0)
-            cleanup_callback: Optional cleanup function
-        
-        Raises:
-            ValueError: If max_threads <= 0
-        """
         if max_threads <= 0:
             raise ValueError(f"max_threads must be positive, got {max_threads}")
         self.max_threads = max_threads
@@ -88,18 +76,8 @@ class BoundedThreadCache:
     def get(self, thread_id: str) -> Optional[Dict[str, Any]]:
         """
         Get thread config and mark as recently used.
-        
-        This implements the "recently used" part of LRU - accessing an item
-        moves it to the end of the queue, making it less likely to be evicted.
-        
-        Args:
-            thread_id: Thread ID to retrieve
-            
-        Returns:
-            Thread config dict if found, None otherwise
         """
         if thread_id in self.cache:
-            # Move to end (mark as recently used)
             self.cache.move_to_end(thread_id)
             return self.cache[thread_id]
         return None
@@ -107,38 +85,22 @@ class BoundedThreadCache:
     def set(self, thread_id: str, config: Dict[str, Any]) -> None:
         """
         Add or update thread config.
-        
         If thread exists: Updates config and marks as recently used.
         If thread is new and cache is full: Evicts oldest thread first.
-        
-        Args:
-            thread_id: Thread ID
-            config: Configuration dictionary
         """
         if thread_id in self.cache:
-            # Update existing - move to end (mark as recently used)
             self.cache.move_to_end(thread_id)
             self.cache[thread_id] = config
         else:
-            # Check if we need to evict oldest thread
             if len(self.cache) >= self.max_threads:
                 self._evict_oldest()
-            
-            # Add new thread
             self.cache[thread_id] = config
     
     def remove(self, thread_id: str) -> bool:
         """
         Remove a thread from cache.
-        
         Note: This does NOT call the cleanup callback. Use this for manual
         removal where you want to handle cleanup separately.
-        
-        Args:
-            thread_id: Thread ID to remove
-            
-        Returns:
-            True if thread was removed, False if not found
         """
         if thread_id in self.cache:
             del self.cache[thread_id]
@@ -148,7 +110,6 @@ class BoundedThreadCache:
     def _evict_oldest(self) -> None:
         """
         Evict the oldest (least recently used) thread.
-        
         This is called automatically when cache reaches capacity.
         Calls cleanup callback if provided before removing the thread.
         """
@@ -189,28 +150,11 @@ class BoundedThreadCache:
         return count
     
     def __contains__(self, thread_id: str) -> bool:
-        """
-        Check if thread exists in cache.
-        
-        Supports: if thread_id in cache: ...
-        
-        Args:
-            thread_id: Thread ID to check
-            
-        Returns:
-            True if thread exists, False otherwise
-        """
+        """Check if thread exists in cache."""
         return thread_id in self.cache
     
     def __len__(self) -> int:
-        """
-        Get current number of threads in cache.
-        
-        Supports: len(cache)
-        
-        Returns:
-            Number of threads currently in cache
-        """
+        """Get current number of threads in cache."""
         return len(self.cache)
     
     def get_stats(self) -> Dict[str, Any]:
@@ -254,46 +198,46 @@ class BoundedThreadCache:
 
 
 
-if __name__ == "__main__":
-    print("BoundedThreadCache - Example Usage\n" + "="*50)
+# if __name__ == "__main__":
+#     print("BoundedThreadCache - Example Usage\n" + "="*50)
     
-    # Example 1: Basic usage
-    print("\n1. Basic usage (no cleanup)")
-    cache = BoundedThreadCache(max_threads=3)
+#     # Example 1: Basic usage
+#     print("\n1. Basic usage (no cleanup)")
+#     cache = BoundedThreadCache(max_threads=3)
     
-    cache.set("thread-1", {"user": "Alice", "messages": 5})
-    cache.set("thread-2", {"user": "Bob", "messages": 3})
-    cache.set("thread-3", {"user": "Charlie", "messages": 7})
+#     cache.set("thread-1", {"user": "Alice", "messages": 5})
+#     cache.set("thread-2", {"user": "Bob", "messages": 3})
+#     cache.set("thread-3", {"user": "Charlie", "messages": 7})
     
-    print(f"Stats: {cache.get_stats()}")
-    print(f"Get thread-2: {cache.get('thread-2')}")
+#     print(f"Stats: {cache.get_stats()}")
+#     print(f"Get thread-2: {cache.get('thread-2')}")
     
-    # This will evict thread-1 (oldest)
-    cache.set("thread-4", {"user": "David", "messages": 2})
-    print(f"\nAfter adding thread-4:")
-    print(f"Thread IDs: {cache.get_thread_ids()}")
-    print(f"thread-1 exists: {cache.get('thread-1') is not None}")
+#     # This will evict thread-1 (oldest)
+#     cache.set("thread-4", {"user": "David", "messages": 2})
+#     print(f"\nAfter adding thread-4:")
+#     print(f"Thread IDs: {cache.get_thread_ids()}")
+#     print(f"thread-1 exists: {cache.get('thread-1') is not None}")
     
-    # Example 2: With cleanup callback
-    print("\n2. With cleanup callback")
+#     # Example 2: With cleanup callback
+#     print("\n2. With cleanup callback")
     
-    cleanup_log = []
+#     cleanup_log = []
     
-    def my_cleanup(thread_id: str):
-        cleanup_log.append(thread_id)
-        print(f"   🧹 Cleaning up resources for {thread_id}")
+#     def my_cleanup(thread_id: str):
+#         cleanup_log.append(thread_id)
+#         print(f"   🧹 Cleaning up resources for {thread_id}")
     
-    cache2 = BoundedThreadCache(max_threads=2, cleanup_callback=my_cleanup)
-    cache2.set("session-1", {"data": "A"})
-    cache2.set("session-2", {"data": "B"})
-    cache2.set("session-3", {"data": "C"})  # Will evict session-1
+#     cache2 = BoundedThreadCache(max_threads=2, cleanup_callback=my_cleanup)
+#     cache2.set("session-1", {"data": "A"})
+#     cache2.set("session-2", {"data": "B"})
+#     cache2.set("session-3", {"data": "C"})  # Will evict session-1
     
-    print(f"Cleanup was called for: {cleanup_log}")
+#     print(f"Cleanup was called for: {cleanup_log}")
     
-    # Example 3: Clear all with cleanup
-    print("\n3. Clear all threads")
-    cache2.clear(call_cleanup=True)
-    print(f"Total cleanups called: {len(cleanup_log)}")
+#     # Example 3: Clear all with cleanup
+#     print("\n3. Clear all threads")
+#     cache2.clear(call_cleanup=True)
+#     print(f"Total cleanups called: {len(cleanup_log)}")
     
-    print("\n" + "="*50)
-    print("Examples completed!")
+#     print("\n" + "="*50)
+#     print("Examples completed!")
