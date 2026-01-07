@@ -137,6 +137,35 @@ def get_word_count(text: str) -> int:
     """
     return len(text.split())
 
+@mcp.tool()
+def get_drug_name(set_id:str) -> list[str]:
+    url = "https://api.fda.gov/drug/label.json"
+    params = {"search": f"set_id:{set_id}", "limit": 1}
+    response = requests.get(url, params=params)
+    drug_names = []
+    if "results" in response:
+        results = response["results"]
+        for result in results:
+            if "openfda" in result and "brand_name" in result["openfda"]:
+                drug_names.extend(result["openfda"]["brand_name"])
+    return drug_names
+
+@mcp.prompt()
+def generate_extracting_relevant_info_prompt() -> str: 
+    return """You are an expert at extracting relevant information from dicuments/api response.
+
+        Task
+        - Identify and extract key details from clinical trial records.
+
+        Rules
+        - Focus on trial phase, population demographics, interventions, primary outcomes, and safety data.
+        - Highlight any limitations or potential biases in the study design or reporting.
+
+        Output
+        - A concise summary of the trial's key aspects.
+        - An assessment of the reliability and applicability of the findings.
+        """
+
 if __name__ == "__main__":
     # Initialize and run the server
     mcp.run(transport='stdio')

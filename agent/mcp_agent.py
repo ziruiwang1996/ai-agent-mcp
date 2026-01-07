@@ -1,3 +1,4 @@
+import asyncio
 import re
 import os
 import json
@@ -22,11 +23,11 @@ class MCPAgent:
     def __init__(
         self,
         chat_model: BaseChatModel,
-        mcp_server_name: str,
+        mcp_config_key: str,
         system_message: str
     ):
         self.chat_model: BaseChatModel = chat_model
-        self.mcp_server_name: str = mcp_server_name
+        self.mcp_config_key: str = mcp_config_key
         self.system_message: str = system_message
         self.tools: List[Any] = []
         self.agent: Optional[CompiledStateGraph] = None
@@ -40,7 +41,7 @@ class MCPAgent:
                 raw_config = file.read()
                 expanded_config = expand_env_in_text(raw_config)
                 config = json.loads(expanded_config)
-                servers = config.get(self.mcp_server_name, {})
+                servers = config.get(self.mcp_config_key, {})
                 client = MultiServerMCPClient(servers)
                 self.tools = await client.get_tools()
         except Exception as e:
@@ -66,6 +67,7 @@ class MCPAgent:
             HumanMessage(content=user_input)
         ]
         response = await self.agent.ainvoke({"messages": messages})
+        print(f"Agent response: {response}")
         last = response.get("messages", [])[-1] if response.get("messages") else None
         response = getattr(last, "content", "No response generated") if last else "No response generated"
         return response

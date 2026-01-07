@@ -1,5 +1,5 @@
 {
-    "label_interpreter_agent": {
+    "label_agent": {
         "drug_label": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
@@ -18,11 +18,49 @@
         }
     },
 
-    "FAERS_summarizer_agent": {
+    "faers_agent": {
         "adverse_event": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/adverse_event_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "shared_tool": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/shared_tool_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        }
+    },
+
+    "rwe_agent": {
+        "pubmed": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/pubmed_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "shared_tool": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/shared_tool_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        }
+    },
+
+    "clinical_trials_agent": {
+        "clinical_trials": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/clinical_trials_server.py"],
             "env": {
                 "PYTHONPATH": "${APP_PATH}"
             }
@@ -58,6 +96,14 @@
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/adverse_event_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "clinical_trials": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/clinical_trials_server.py"],
             "env": {
                 "PYTHONPATH": "${APP_PATH}"
             }

@@ -23,11 +23,11 @@ class ChatAgent(MCPAgent):
     def __init__(
         self,
         chat_model: BaseChatModel,
-        mcp_server_name: str,
+        mcp_config_key: str,
         system_message: str,
         embedding: str
     ):
-        super().__init__(chat_model, mcp_server_name, system_message)
+        super().__init__(chat_model, mcp_config_key, system_message)
         self.timeout: int = 60 
         self.trimmer: list[BaseMessage] = None
         self.embedding_model: Any = GoogleGenerativeAIEmbeddings(model=embedding)

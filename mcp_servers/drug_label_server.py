@@ -19,9 +19,9 @@ _MERRIAM_WEBSTER_MEDICAL_DICTIONARY_BASE_URL = "https://www.dictionaryapi.com/ap
 @mcp.resource("file:///openfda//label_searchable_fields")
 def get_searchable_fields_of_drug_labeling():
     """Return openFDA Drug Labeling searchable field documentation (YAML).
-
-    This is intended to be used by the agent as a reference for building valid
-    `search` queries against https://api.fda.gov/drug/label.json.
+    This is intended to be used by the agent as a reference for building valid `search` queries 
+    against https://api.fda.gov/drug/label.json, and for understanding the structure of the 
+    returned drug label records.
     """
     try:
         with open(_LABEL_SEARCHABLE_FIELDS_PATH, "r", encoding="utf-8") as f:
