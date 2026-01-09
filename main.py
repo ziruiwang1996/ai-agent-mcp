@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from services.container import Services, build_services
-from api import chat, interpret, tools
+from api import chat, interpret, tools, evidence
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,6 +13,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(chat.router)
 app.include_router(interpret.router)
 app.include_router(tools.router)
+app.include_router(evidence.router)
 
 # Allow CORS for local development
 app.add_middleware(

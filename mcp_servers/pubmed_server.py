@@ -16,7 +16,7 @@ def search_pubmed_real_world_clinical_studies(
     age_group: Optional[str] = None,
     sex: Optional[str] = None,
     setting: Optional[str] = None,
-    years_back: int = 10,
+    years_back: int = 15,
 ) -> List[str]:
     """Search PubMed for *real‑world* or clinically relevant evidence about a drug for a condition.
 
@@ -30,14 +30,14 @@ def search_pubmed_real_world_clinical_studies(
       Optional filters below are *best-effort* keyword filters, not guarantees.
 
     Args:
-        drug: Medication of interest (brand or generic), e.g. "semaglutide" or "Ozempic".
-        condition: User's condition/disease context, e.g. "type 2 diabetes".
-        max_results: Maximum PubMed IDs to return (default: 10).
-        age_group: Optional, e.g. "pediatric", "adolescent", "adult", "older adult".
-        sex: Optional, e.g. "female", "male".
-        setting: Optional context keywords, e.g. "pregnancy", "renal impairment", "CKD",
+        drug (Required): Medication of interest (brand or generic), e.g. "semaglutide" or "Ozempic".
+        condition (Required): User's condition/disease context, e.g. "type 2 diabetes".
+        max_results (Optional): Maximum PubMed IDs to return (default: 10).
+        age_group (Optional): Optional, e.g. "pediatric", "adolescent", "adult", "older adult".
+        sex (Optional): Optional, e.g. "female", "male".
+        setting (Optional): Optional context keywords, e.g. "pregnancy", "renal impairment", "CKD",
             "Asian", "Medicare", "claims", "registry".
-        years_back: Limit results to recent years (default: 10).
+        years_back (Optional): Limit results to recent years (default: 15).
 
     Returns:
         List of PubMed IDs (PMIDs) matching the query.
@@ -244,6 +244,7 @@ def generate_real_world_evidence_analysis_prompt() -> str:
         - When comparing study populations to the user, emphasize that similarities are approximate and based on the limited fields available.
         - Avoid quoting or inventing statistical measures unless they appear verbatim in the abstract. Paraphrase effect directions qualitatively.
         - Explain how RWE complements randomized trials and FAERS when relevant without claiming any single source is definitive.
+        - Preserve references to specific studies, PMIDs, and data sources inside the response so the reader can trace each point back to its origin.
 
         REQUIRED DISCLOSURES
         - State that RWE studies observe associations in routine care and cannot prove causality.

@@ -62,15 +62,18 @@ class MCPAgent:
     async def process_input(self, user_input: str) -> str:
         if not self.agent:
             return "Agent failed to initialize; check model setup logs."
-        messages = [
-            SystemMessage(content=self.system_message),
-            HumanMessage(content=user_input)
-        ]
-        response = await self.agent.ainvoke({"messages": messages})
-        print(f"Agent response: {response}")
-        last = response.get("messages", [])[-1] if response.get("messages") else None
-        response = getattr(last, "content", "No response generated") if last else "No response generated"
-        return response
+        try:
+            messages = [
+                SystemMessage(content=self.system_message),
+                HumanMessage(content=user_input)
+            ]
+            response = await self.agent.ainvoke({"messages": messages})
+            # print(f"Agent response: {response}")
+            last = response.get("messages", [])[-1] if response.get("messages") else None
+            response = getattr(last, "content", "No response generated") if last else "No response generated"
+            return response
+        except Exception as e:
+            return f"Error: {str(e)}"
     
     def get_available_tools(self) -> list[dict[str, str]]:
         return [

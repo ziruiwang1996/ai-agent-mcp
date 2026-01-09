@@ -1,6 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from urllib.parse import urlparse
 from typing import Any, Optional
+from textwrap import dedent
 import requests
 
 mcp = FastMCP("shared_tool")
@@ -15,24 +16,26 @@ _OPENFDA_ENDPOINTS: dict[str, str] = {
     # Common openFDA endpoints used across agents.
     "drug_label": "https://api.fda.gov/drug/label.json",
     "drug_event": "https://api.fda.gov/drug/event.json",
-    # Add more as needed, e.g. "drug_enforcement": "https://api.fda.gov/drug/enforcement.json"
 }
-
 
 @mcp.resource("file:///openfda/endpoints")
 def openfda_endpoints() -> str:
     """Agent reference: known openFDA endpoints supported by this shared tool server."""
-    lines = ["# openFDA endpoints", ""]
-    for name, url in sorted(_OPENFDA_ENDPOINTS.items()):
-        lines.append(f"- {name}: {url}")
-    lines.append("")
-    lines.append("Use `openfda_search(endpoint=..., search=...)` for flexible queries.")
-    return "\n".join(lines)
+    return """
+        # openFDA endpoints
+        - drug_event: https://api.fda.gov/drug/event.json
+        - drug_label: https://api.fda.gov/drug/label.json
+        Use `openfda_search(endpoint=..., search=...)` for flexible queries.
+    """
 
 @mcp.tool()
-def make_api_call(url: str, params: dict, headers: Optional[dict[str, str]] = None, timeout_s: int = 15) -> dict:
+def make_api_call(
+    url: Optional[str] = None,
+    params: Optional[dict] = None,
+    headers: Optional[dict[str, str]] = None,
+    timeout_s: int = 15,
+) -> dict:
     """Make a safe GET request to an allowlisted public API.
-
     This is a *shared* utility for agents. It is intentionally conservative:
     - Only `https` URLs
     - Host allowlist to avoid SSRF / unexpected egress
@@ -47,6 +50,9 @@ def make_api_call(url: str, params: dict, headers: Optional[dict[str, str]] = No
     Returns:
         Parsed JSON response dict on success, or `{error: ...}`.
     """
+    if not url:
+        return {"error": "Missing required url parameter."}
+
     try:
         parsed = urlparse(url)
     except Exception:
@@ -58,7 +64,6 @@ def make_api_call(url: str, params: dict, headers: Optional[dict[str, str]] = No
         return {"error": f"Host not allowed: {parsed.hostname}"}
 
     safe_params: dict[str, Any] = dict(params or {})
-    # Common safety clamp for public APIs.
     if "limit" in safe_params:
         try:
             safe_params["limit"] = max(1, min(int(safe_params["limit"]), 100))
@@ -76,7 +81,6 @@ def make_api_call(url: str, params: dict, headers: Optional[dict[str, str]] = No
 @mcp.tool()
 def openfda_search(endpoint: str, search: str, limit: int = 5, skip: int = 0) -> dict:
     """Search an openFDA endpoint using a custom Lucene-style `search` query.
-
     Use this when an agent wants a customized query against openFDA, and already
     knows which endpoint to use (e.g. drug label vs adverse events).
 
@@ -120,11 +124,6 @@ def openfda_search(endpoint: str, search: str, limit: int = 5, skip: int = 0) ->
 
 
 @mcp.tool()
-def openfda_label_search(search: str, limit: int = 5, skip: int = 0) -> dict:
-    """Backward-compatible wrapper for `openfda_search(endpoint="drug_label", ...)`."""
-    return openfda_search(endpoint="drug_label", search=search, limit=limit, skip=skip)
-
-@mcp.tool()
 def get_word_count(text: str) -> int:
     """
     Get the word count of the provided text.
@@ -138,35 +137,77 @@ def get_word_count(text: str) -> int:
     return len(text.split())
 
 @mcp.tool()
-def get_drug_name(set_id:str) -> list[str]:
-    url = "https://api.fda.gov/drug/label.json"
-    params = {"search": f"set_id:{set_id}", "limit": 1}
-    response = requests.get(url, params=params)
-    drug_names = []
-    if "results" in response:
-        results = response["results"]
-        for result in results:
-            if "openfda" in result and "brand_name" in result["openfda"]:
-                drug_names.extend(result["openfda"]["brand_name"])
-    return drug_names
+def get_drug_name(set_id:str) -> dict:
+    """Get drug names (brand, generic, substance) from openFDA drug label endpoint using set_id.
+
+    Args:
+        set_id: The set_id of the drug label.
+
+    Returns:
+        A dict containing brand_name, generic_name, and substance_name lists, or an error message
+    """
+    params = {
+        "search": f"set_id:{set_id}", "limit": 1}
+    try: 
+        response = requests.get(_OPENFDA_ENDPOINTS.get("drug_label"), params=params)
+        response.raise_for_status()
+        data = response.json()
+        results = data.get("results", [])
+        if results:
+            drug_names = results[0].get("openfda", {})
+            return {
+                "brand_name": drug_names.get("brand_name", []),
+                "generic_name": drug_names.get("generic_name", []),
+                "substance_name": drug_names.get("substance_name", [])
+            }
+        return []
+    except requests.exceptions.RequestException as e:
+        return {"error": f"API call failed: {str(e)}"}
+
 
 @mcp.prompt()
-def generate_extracting_relevant_info_prompt() -> str: 
-    return """You are an expert at extracting relevant information from dicuments/api response.
+def generate_extracting_relevant_info_prompt() -> str:
+        return dedent(
+            """ROLE
+            You are a relevance filter supporting multiple evidence agents. Your job is to capture the smallest set of text or structured fields that the downstream analysis agent must retain.
 
-        Task
-        - Identify and extract key details from clinical trial records.
+            INPUT SOURCES
+            - API responses (JSON) from shared tools such as openFDA, ClinicalTrials.gov, and PubMed.
+            - Document excerpts or other semi-structured text.
+            Maintain the original wording where feasible so later agents can cite accurately.
 
-        Rules
-        - Focus on trial phase, population demographics, interventions, primary outcomes, and safety data.
-        - Highlight any limitations or potential biases in the study design or reporting.
+            TRIAGE STEPS
+            1. Determine what kind of payload you received (clinical trial record, FAERS case, drug label, PubMed abstract, etc.).
+            2. Extract only the fields that materially impact safety, effectiveness, eligibility, or context for the user’s question.
+            3. Ignore boilerplate (API metadata, pagination, legal disclaimers, unrelated sections).
+            4. Note any missing or uncertain information that could affect interpretation later.
 
-        Output
-        - A concise summary of the trial's key aspects.
-        - An assessment of the reliability and applicability of the findings.
-        """
+            FIELD PRIORITIES BY SOURCE
+            - Clinical trial records: title, identifier, design/phase, population (eligibility, size, key demographics), interventions and comparators, primary/secondary outcomes with results if stated, safety signals, limitations.
+            - FAERS/openFDA adverse event data: drug identifiers, query filters, report counts, top reactions with seriousness flags, notable comorbidities or concomitant meds, reporting time frame, data quality limits.
+            - PubMed or RWE abstracts: study type, population, setting/data source, exposures, comparators, key outcome signals (effect direction), major limitations or confounders.
+            - Drug label sections: section name, core directives (indications, dosing, contraindications, boxed warnings), critical numeric thresholds, relevant populations.
+
+            OUTPUT FORMAT
+            Provide a compact JSON object with two keys:
+            {
+                "context": [
+                    "key fact 1",
+                    "key fact 2"
+                ],
+                "gaps": ["missing or uncertain details"]
+            }
+            - Each entry in "context" should be a full sentence fragment that can stand alone.
+            - Use "gaps" to capture absent data, unclear fields, or reasons the record might be unreliable. Use an empty list if nothing is missing.
+
+            STYLE & SAFETY
+            - Remain neutral; do not interpret or speculate.
+            - Do not add advice or conclusions. Leave synthesis for downstream agents.
+            - Preserve critical numbers, units, and named entities exactly as provided.
+            """
+        )
 
 if __name__ == "__main__":
     # Initialize and run the server
     mcp.run(transport='stdio')
-    #print(openfda_endpoints())
+    #print(get_drug_name("595f437d-2729-40bb-9c62-c8ece1f82780"))

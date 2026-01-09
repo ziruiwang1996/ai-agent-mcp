@@ -10,6 +10,11 @@ if [ -z "${API_KEY}" ]; then
     exit 1
 fi
 
+# Align async HTTPS clients with the trusted cert bundle baked into the image.
+CERT_PATH="$(python3 -c 'import certifi; print(certifi.where())')"
+export SSL_CERT_FILE="${CERT_PATH}"
+export REQUESTS_CA_BUNDLE="${CERT_PATH}"
+
 # Set environment variables for MCP configuration
 export PYTHON_PATH="/usr/local/bin/python3"
 export APP_PATH="/app"

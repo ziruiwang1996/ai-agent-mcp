@@ -1,7 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 import requests
 import os
-from datetime import date, datetime
 from textwrap import dedent
 from typing import Any, Optional
 
@@ -68,7 +67,6 @@ def extract_report_from_raw_json(results: list[dict]) -> list[dict]:
 
         reports.append(
             {
-                "reportduplicate": report.get("reportduplicate", {}),
                 "safetyreportid": report.get("safetyreportid", ""),
                 "serious": report.get("serious", ""),
                 "seriousnesscongenitalanomali": report.get("seriousnesscongenitalanomali", ""),
@@ -99,7 +97,6 @@ def _split_csv(value: Optional[str]) -> Optional[list[str]]:
     items = [v.strip() for v in str(value).split(",")]
     items = [v for v in items if v]
     return items or None
-
 
 def _lucene_quote(term: str) -> str:
     """Quote a term for openFDA/Lucene queries.
@@ -196,29 +193,29 @@ def formulate_search_query(
 
 @mcp.tool()
 def get_adverse_event_reports(
-    set_id: str, 
+    set_id: Optional[str] = None,
     *,
-    age: Optional[int], 
-    age_window: Optional[int],
-    weight: Optional[float], 
-    weight_window: Optional[float],
-    sex: Optional[str],
-    conditions: Optional[str],
-    other_medications: Optional[str]
+    age: Optional[int] = None,
+    age_window: Optional[int] = None,
+    weight: Optional[float] = None,
+    weight_window: Optional[float] = None,
+    sex: Optional[str] = None,
+    conditions: Optional[str] = None,
+    other_medications: Optional[str] = None,
 ) -> dict:
     """Fetch FAERS adverse event reports filtered by patient/drug attributes.
     This calls the openFDA FAERS endpoint and returns a compact subset of fields
     (not the full raw report) for each matching case.
 
     Args:
-        set_id: SPL set ID to match against `patient.drug.openfda.spl_set_id`.
-        age: Approximate onset age in years.
-        age_window: +/- years around `age` for matching.
-        weight: Approximate patient weight in kilograms.
-        weight_window: +/- kg around `weight` for matching.
-        sex: Patient sex as "male"/"female"/"unknown" or "1"/"2"/"0".
-        conditions: Comma-separated list of medical conditions (indications) to filter on.
-        other_medications: Comma-separated list of other medications to filter on.
+        set_id (Required): SPL set ID to match against `patient.drug.openfda.spl_set_id`.
+        age (Optional): Approximate onset age in years. Optional.
+        age_window (Optional): +/- years around `age` for matching.
+        weight (Optional): Approximate patient weight in kilograms.
+        weight_window (Optional): +/- kg around `weight` for matching.
+        sex (Optional): Patient sex as "male"/"female"/"unknown" or "1"/"2"/"0".
+        conditions (Optional): Comma-separated list of medical conditions (indications) to filter on.
+        other_medications (Optional): Comma-separated list of other medications to filter on.
 
     Notes:
         - FAERS is a spontaneous reporting system with reporting bias and missing data.
@@ -227,6 +224,9 @@ def get_adverse_event_reports(
     Returns:
         A dict with `search_query`, `total_reports`, and `reports` on success, or `error`.
     """
+    if not set_id:
+        return {"error": "Missing required set_id parameter."}
+
     conditions_list = _split_csv(conditions)
     other_meds_list = _split_csv(other_medications)
 
@@ -245,7 +245,7 @@ def get_adverse_event_reports(
 
     params = {
         "search": search_query,
-        "limit": 100,
+        "limit": 10,
     }
     data = _openfda_get_json(params)
     if "error" in data:
@@ -271,33 +271,36 @@ def get_adverse_event_reports(
 
 @mcp.tool()
 def get_adverse_reaction_count(
-    set_id: str, 
+    set_id: Optional[str] = None,
     *,
-    age: Optional[int], 
-    age_window: Optional[int],
-    weight: Optional[float], 
-    weight_window: Optional[float],
-    sex: Optional[str],
-    conditions: Optional[str],
-    other_medications: Optional[str]
+    age: Optional[int] = None,
+    age_window: Optional[int] = None,
+    weight: Optional[float] = None,
+    weight_window: Optional[float] = None,
+    sex: Optional[str] = None,
+    conditions: Optional[str] = None,
+    other_medications: Optional[str] = None,
 ) -> dict:
     """Return a frequency table of reported reactions (MedDRA PT) for matching FAERS cases.
     This uses openFDA's `count=` aggregation, so it is more memory-efficient than
     fetching and parsing full case reports.
 
     Args:
-        set_id: SPL set ID to match against `patient.drug.openfda.spl_set_id`.
-        age: Approximate onset age in years.
-        age_window: +/- years around `age` for matching.
-        weight: Approximate patient weight in kilograms.
-        weight_window: +/- kg around `weight` for matching.
-        sex: Patient sex as "male"/"female"/"unknown" or "1"/"2"/"0".
-        conditions: Comma-separated list of medical conditions (indications) to filter on.
-        other_medications: Comma-separated list of other medications to filter on.
+        set_id (Required): SPL set ID to match against `patient.drug.openfda.spl_set_id`.
+        age (Optional): Approximate onset age in years.
+        age_window (Optional): +/- years around `age` for matching.
+        weight (Optional): Approximate patient weight in kilograms.
+        weight_window (Optional): +/- kg around `weight` for matching.
+        sex (Optional): Patient sex as "male"/"female"/"unknown" or "1"/"2"/"0".
+        conditions (Optional): Comma-separated list of medical conditions (indications) to filter on.
+        other_medications (Optional): Comma-separated list of other medications to filter on.
 
     Returns:
         A dict with `search_query`, `total_reports`, and `results` (reaction counts) on success, or `error`.  
     """
+    if not set_id:
+        return {"error": "Missing required set_id parameter."}
+
     conditions_list = _split_csv(conditions)
     other_meds_list = _split_csv(other_medications)
 
@@ -364,6 +367,7 @@ def generate_faers_analysis_prompt() -> str:
         • Separate serious outcomes from routine experiences. Acknowledge seriousness without alarmism and call out that serious cases often involve other conditions or medications when supported by the data.
         • Cross-check observations against known information from the FDA-approved drug label if supplied elsewhere in the conversation. Flag overlaps or meaningful differences without suggesting new safety conclusions.
         • Maintain professional boundaries: no medical advice, treatment plans, dosing guidance, or statements about what an individual should do. Avoid calculations of incidence or likelihood.
+        • Keep explicit references to the FAERS database and any tools or resources used so the response clearly states where each insight originated.
 
         REQUIRED DISCLOSURES
         • State clearly that FAERS is a voluntary reporting system and that case submissions do not prove the drug caused an event.

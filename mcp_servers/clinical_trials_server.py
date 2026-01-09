@@ -3,7 +3,7 @@ from mcp.server.fastmcp import FastMCP
 from textwrap import dedent
 from typing import Any, Optional
 
-mcp = FastMCP("clinical_trial")
+mcp = FastMCP("clinical_trials")
 
 _CLINICAL_TRIALS_DOT_GOV_BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
 _HTTP_SESSION = requests.Session()
@@ -232,12 +232,12 @@ def search_clinical_trials(
     """Search ClinicalTrials.gov and return user-oriented trial summaries.
     
     Args:
-        conditions: Conditions/disease terms to search for.
-        intervention: Intervention/drug term to search for.
-        max_results: Maximum number of studies to retrieve from the first page (default: 5).
-        user_age: Optional user age in years (used only for basic eligibility comparison).
-        user_sex: Optional user sex (male/female/unknown or 1/2/0).
-        user_weight_kg: Optional user weight in kg (CT.gov often doesn't provide comparable fields).
+        conditions (Optional): Conditions/disease terms to search for.
+        intervention (Optional): Intervention/drug term to search for.
+        max_results (Optional): Maximum number of studies to retrieve from the first page (default: 5).
+        user_age (Optional): Optional user age in years (used only for basic eligibility comparison).
+        user_sex (Optional): Optional user sex (male/female/unknown or 1/2/0).
+        user_weight_kg (Optional): Optional user weight in kg (CT.gov often doesn't provide comparable fields).
         
     Returns:
         A dict containing the query, a list of summarized studies, and pagination token.
@@ -316,8 +316,8 @@ def generate_clinical_trial_analysis_prompt() -> str:
         in trials may differ from broader real-world use.
         - Highlight study limitations such as sample size, duration, placebo use, or lack of certain subgroups. Avoid overstating certainty or 
         generalizability.
-        - Maintain professional boundaries. Do not offer medical advice, treatment recommendations, diagnoses, or instructions to start, stop, 
-        or change therapy.
+        - Maintain professional boundaries. Do not offer medical advice, treatment recommendations, diagnoses, or instructions to start, stop, or change therapy.
+        - Retain references to trial identifiers, registries, and data sources within the response so readers can see exactly where each fact originated.
 
         COMMUNICATING RESULTS
         - Describe observed benefits and harms at the cohort level without implying individual predictions.

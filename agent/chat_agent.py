@@ -412,4 +412,4 @@ class ChatAgent(MCPAgent):
         except asyncio.TimeoutError:
             return f"Error: Request timed out after {self.timeout}s"
         except Exception as e:
-            return f"Error: {e}"
+            return f"Error: {str(e)}"

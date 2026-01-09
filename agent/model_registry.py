@@ -1,10 +1,18 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import Any, Dict, Mapping, Union
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 import os
 from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+import certifi
+
+# Align Python SSL clients with certifi so async HTTPS calls succeed in dev/runtime.
+_CERT_PATH = certifi.where()
+os.environ.setdefault("SSL_CERT_FILE", _CERT_PATH)
+os.environ.setdefault("REQUESTS_CA_BUNDLE", _CERT_PATH)
 
 @dataclass(frozen=True)
 class ModelSpec:
@@ -14,22 +22,26 @@ class ModelSpec:
 
 DEFAULT_MODEL_REGISTRY: Mapping[str, ModelSpec] = {
     "gemini": ModelSpec(name="gemini-2.5-flash", provider="google_genai"),
-    "med_gemma": ModelSpec(name="google/medgemma-4b-it", provider="langchain-huggingface"),
-    "tx_gemma": ModelSpec(name="google/txgemma-9b-chat", provider="langchain-huggingface"),
+    # "med_gemma": ModelSpec(name="google/medgemma-4b-it", provider=""),
+    # "tx_gemma": ModelSpec(name="google/txgemma-9b-chat", provider=""),
+    "bigbird": ModelSpec(name="google/bigbird-pegasus-large-arxiv", provider="hf-inference"),
+    "openai": ModelSpec(
+        name="openai/gpt-oss-20b", 
+        provider="huggingface", 
+        kwargs={"task": "text-generation", "max_new_tokens": 1024}),
 }
 
 class ModelRegistry:
     def __init__(
         self,
-        registry: Optional[Mapping[str, ModelSpec]] = None,
         *,
         enable_cache: bool = True,
     ):
-        self._registry: Mapping[str, ModelSpec] = registry or DEFAULT_MODEL_REGISTRY
+        self._registry: Mapping[str, ModelSpec] = DEFAULT_MODEL_REGISTRY
         self._enable_cache = enable_cache
-        self._cache: Dict[str, BaseChatModel] = {}
+        self._cache: Dict[str, BaseChatModel | InferenceClient] = {}
 
-    def resolve(self, ref: Union[str, ModelSpec, BaseChatModel]) -> BaseChatModel:
+    def resolve(self, ref: Union[str, ModelSpec, BaseChatModel, InferenceClient]) -> BaseChatModel | InferenceClient:
         """Resolve a model reference into a concrete LangChain chat model.
 
         Accepted refs:
@@ -37,31 +49,41 @@ class ModelRegistry:
         - str: treated as a registry key (e.g. "gemini")
         - ModelSpec: created via init_chat_model
         """
-        load_dotenv()
-        if not os.getenv("GOOGLE_API_KEY"):
-            raise ValueError("GOOGLE_API_KEY environment variable is not set.")
-        os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
-
         if isinstance(ref, BaseChatModel):
+            return ref
+        
+        if isinstance(ref, InferenceClient):
             return ref
 
         if isinstance(ref, ModelSpec):
-            return init_chat_model(ref.name, model_provider=ref.provider, **(ref.kwargs or {}))
+            if ref.provider == "hf-inference":
+                model = self._via_inference_client(ref)
+            elif ref.provider == "huggingface":
+                model = self._via_huggingface_endpoint(ref)
+            else:
+                model = self._via_init_chat_model(ref)
+            if self._enable_cache:
+                self._cache[ref.name] = model
+            return model
 
         if isinstance(ref, str):
-            key = ref
-            if self._enable_cache and key in self._cache:
-                return self._cache[key]
-            if key not in self._registry:
+            if self._enable_cache and ref in self._cache:
+                return self._cache[ref]
+            if ref not in self._registry:
                 raise ValueError(
-                    f"Unknown model key '{key}'. "
+                    f"Unknown model key '{ref}'. "
                     f"Known keys: {sorted(self._registry.keys())}. "
                     "Pass a BaseChatModel to override directly, or a ModelSpec(name=..., provider=...)."
                 )
-            spec = self._registry[key]
-            model = init_chat_model(spec.name, model_provider=spec.provider, **(spec.kwargs or {}))
+            spec = self._registry[ref]
+            if spec.provider == "hf-inference":
+                model = self._via_inference_client(spec)
+            elif spec.provider == "huggingface":
+                model = self._via_huggingface_endpoint(spec)
+            else:
+                model = self._via_init_chat_model(spec)
             if self._enable_cache:
-                self._cache[key] = model
+                self._cache[ref] = model
             return model
 
         raise TypeError(f"Unsupported model reference type: {type(ref).__name__}")
@@ -73,12 +95,31 @@ class ModelRegistry:
 
     def keys(self) -> list[str]:
         return sorted(self._registry.keys())
+    
+    def _via_huggingface_endpoint(self, spec: ModelSpec) -> ChatHuggingFace:
+        load_dotenv()
+        llm = HuggingFaceEndpoint(
+            repo_id=spec.name,
+            task=spec.kwargs.get("task") if spec.kwargs else None,
+            max_new_tokens=spec.kwargs.get("max_new_tokens", 1024) if spec.kwargs else 1024,
+            repetition_penalty=1.03,
+            provider="auto",
+            huggingfacehub_api_token = os.environ["HF_API_TOKEN"]
+        )
+        chat_model = ChatHuggingFace(llm=llm)
+        return chat_model
+    
+    def _via_init_chat_model(self, spec: ModelSpec) -> BaseChatModel:
+        load_dotenv()
+        if not os.getenv("GOOGLE_API_KEY"):
+            raise ValueError("GOOGLE_API_KEY environment variable is not set.")
+        os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
+        return init_chat_model(spec.name, model_provider=spec.provider, **(spec.kwargs or {}))
 
-    def get_gemini(self) -> BaseChatModel:
-        return self.resolve("gemini")
-
-    def get_med_gemma(self) -> BaseChatModel:
-        return self.resolve("med_gemma")
-
-    def get_tx_gemma(self) -> BaseChatModel:
-        return self.resolve("tx_gemma")
+    def _via_inference_client(self, spec: ModelSpec) -> InferenceClient:
+        load_dotenv()
+        token = os.environ.get("HF_API_TOKEN")
+        if not token:
+            raise ValueError("HF_API_TOKEN environment variable is not set.")
+        # Use Hugging Face Inference Endpoints with hosted models; this stays fully serverless.
+        return InferenceClient(model=spec.name, token=token)
