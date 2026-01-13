@@ -19,9 +19,9 @@ class EvidenceRequest(BaseModel):
 class EvidenceResponse(BaseModel):
     drug_set_id: str
     drug_name: str
-    faers_report: str
-    rwe_report: str
-    clinical_trials_report: str
+    faers_explanation: str
+    rwe_explanation: str
+    clinical_trials_explanation: str
     summary: str
 
 @router.post("", response_model=EvidenceResponse)
@@ -29,14 +29,16 @@ async def generate_evidence_report(api_request: EvidenceRequest, request: Reques
     services: Services | None = getattr(request.app.state, "services", None)
     if services is None:
         raise HTTPException(status_code=500, detail="Services not initialized")
+    
     request_data = api_request.model_dump()
-    orchestrator = services.orchestrator
-    report = await orchestrator.evidence_report(request_data)
+    evidence_service = services.evidence
+    report = await evidence_service.execute_workflow(request_data)
+
     return EvidenceResponse(
         drug_set_id=api_request.drug_set_id,
         drug_name=api_request.drug_name,
-        faers_report=report.get("faers_report") or "",
-        rwe_report=report.get("rwe_report") or "",
-        clinical_trials_report=report.get("clinical_trials_report") or "",
+        faers_explanation=report.get("faers_explanation") or "",
+        rwe_explanation=report.get("rwe_explanation") or "",
+        clinical_trials_explanation=report.get("clinical_trials_explanation") or "",
         summary=report.get("summary") or ""
     )

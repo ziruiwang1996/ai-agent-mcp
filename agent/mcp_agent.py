@@ -1,11 +1,11 @@
-import asyncio
+from importlib import resources
 import re
 import os
 import json
 from langchain_core.language_models import BaseChatModel
 from langchain_mcp_adapters.client import MultiServerMCPClient  
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from typing import Optional, List, Any
 from langgraph.graph.state import CompiledStateGraph
 
@@ -24,12 +24,14 @@ class MCPAgent:
         self,
         chat_model: BaseChatModel,
         mcp_config_key: str,
-        system_message: str
+        system_prompt: Optional[str] = None 
     ):
         self.chat_model: BaseChatModel = chat_model
         self.mcp_config_key: str = mcp_config_key
-        self.system_message: str = system_message
+
+        self.system_prompt: Optional[Any] = system_prompt
         self.tools: List[Any] = []
+        self.resources: list[Any] = []
         self.agent: Optional[CompiledStateGraph] = None
 
     async def initialize_mcp_client(self) -> None:
@@ -42,8 +44,14 @@ class MCPAgent:
                 expanded_config = expand_env_in_text(raw_config)
                 config = json.loads(expanded_config)
                 servers = config.get(self.mcp_config_key, {})
+
                 client = MultiServerMCPClient(servers)
                 self.tools = await client.get_tools()
+                for server_name in servers.keys():
+                    prompts = await client.get_prompt(server_name, "get_system_prompt")
+                    if prompts:
+                        self.system_prompt = prompts[0]
+                    self.resources.extend(await client.get_resources(server_name))
         except Exception as e:
             print(f"Error initializing MCP client: {e}")
 
@@ -52,10 +60,11 @@ class MCPAgent:
             await self.initialize_mcp_client()
             self.agent = create_agent(
                 model=self.chat_model, 
-                tools=self.tools
+                tools=self.tools,
+                system_prompt=self.system_prompt
             )
         except Exception as e:
-            print(f"Error initializing Label Interpreter agent: {e}")
+            print(f"Error initializing Agent: {e}")
             import traceback
             traceback.print_exc()
         
@@ -63,10 +72,7 @@ class MCPAgent:
         if not self.agent:
             return "Agent failed to initialize; check model setup logs."
         try:
-            messages = [
-                SystemMessage(content=self.system_message),
-                HumanMessage(content=user_input)
-            ]
+            messages = [HumanMessage(content=user_input)]
             response = await self.agent.ainvoke({"messages": messages})
             # print(f"Agent response: {response}")
             last = response.get("messages", [])[-1] if response.get("messages") else None

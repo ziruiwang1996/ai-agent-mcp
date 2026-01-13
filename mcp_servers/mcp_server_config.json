@@ -1,6 +1,6 @@
 {
     "label_agent": {
-        "drug_label": {
+        "label_agent": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/drug_label_server.py"],
@@ -19,7 +19,7 @@
     },
 
     "faers_agent": {
-        "adverse_event": {
+        "faers_agent": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/adverse_event_server.py"],
@@ -38,7 +38,7 @@
     },
 
     "rwe_agent": {
-        "pubmed": {
+        "rwe_agent": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/pubmed_server.py"],
@@ -57,7 +57,7 @@
     },
 
     "clinical_trials_agent": {
-        "clinical_trials": {
+        "clinical_trials_agent": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/clinical_trials_server.py"],
@@ -75,8 +75,27 @@
         }
     },
 
+    "explainer_agent": {
+        "explainer_agent": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/explainer_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        },
+        "shared_tool": {
+            "transport": "stdio",
+            "command": "${PYTHON_PATH}",
+            "args": ["${APP_PATH}/mcp_servers/shared_tool_server.py"],
+            "env": {
+                "PYTHONPATH": "${APP_PATH}"
+            }
+        }
+    },
+
     "chat_agent": {
-        "pubmed": {
+        "rwe": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/pubmed_server.py"],
@@ -84,7 +103,7 @@
                 "PYTHONPATH": "${APP_PATH}"
             }
         },
-        "drug_label": {
+        "drug": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/drug_label_server.py"],
@@ -92,7 +111,7 @@
                 "PYTHONPATH": "${APP_PATH}"
             }
         },
-        "adverse_event": {
+        "faers": {
             "transport": "stdio",
             "command": "${PYTHON_PATH}",
             "args": ["${APP_PATH}/mcp_servers/adverse_event_server.py"],

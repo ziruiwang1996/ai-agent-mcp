@@ -24,7 +24,7 @@ DEFAULT_MODEL_REGISTRY: Mapping[str, ModelSpec] = {
     "gemini": ModelSpec(name="gemini-2.5-flash", provider="google_genai"),
     # "med_gemma": ModelSpec(name="google/medgemma-4b-it", provider=""),
     # "tx_gemma": ModelSpec(name="google/txgemma-9b-chat", provider=""),
-    "bigbird": ModelSpec(name="google/bigbird-pegasus-large-arxiv", provider="hf-inference"),
+    "summarizer": ModelSpec(name="google/bigbird-pegasus-large-arxiv", provider="hf-inference"),
     "openai": ModelSpec(
         name="openai/gpt-oss-20b", 
         provider="huggingface", 
@@ -32,11 +32,7 @@ DEFAULT_MODEL_REGISTRY: Mapping[str, ModelSpec] = {
 }
 
 class ModelRegistry:
-    def __init__(
-        self,
-        *,
-        enable_cache: bool = True,
-    ):
+    def __init__(self, *, enable_cache: bool = True):
         self._registry: Mapping[str, ModelSpec] = DEFAULT_MODEL_REGISTRY
         self._enable_cache = enable_cache
         self._cache: Dict[str, BaseChatModel | InferenceClient] = {}
@@ -57,14 +53,14 @@ class ModelRegistry:
 
         if isinstance(ref, ModelSpec):
             if ref.provider == "hf-inference":
-                model = self._via_inference_client(ref)
+                model_instance = self._via_inference_client(ref)
             elif ref.provider == "huggingface":
-                model = self._via_huggingface_endpoint(ref)
+                model_instance = self._via_huggingface_endpoint(ref)
             else:
-                model = self._via_init_chat_model(ref)
+                model_instance = self._via_init_chat_model(ref)
             if self._enable_cache:
-                self._cache[ref.name] = model
-            return model
+                self._cache[ref.name] = model_instance
+            return model_instance
 
         if isinstance(ref, str):
             if self._enable_cache and ref in self._cache:
@@ -77,14 +73,14 @@ class ModelRegistry:
                 )
             spec = self._registry[ref]
             if spec.provider == "hf-inference":
-                model = self._via_inference_client(spec)
+                model_instance = self._via_inference_client(spec)
             elif spec.provider == "huggingface":
-                model = self._via_huggingface_endpoint(spec)
+                model_instance = self._via_huggingface_endpoint(spec)
             else:
-                model = self._via_init_chat_model(spec)
+                model_instance = self._via_init_chat_model(spec)
             if self._enable_cache:
-                self._cache[ref] = model
-            return model
+                self._cache[ref] = model_instance
+            return model_instance
 
         raise TypeError(f"Unsupported model reference type: {type(ref).__name__}")
 

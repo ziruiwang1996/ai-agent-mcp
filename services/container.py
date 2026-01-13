@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from services.chat_service import ChatService
-from services.agent_orchestrator import AgentOrchestrator
+from services.evidence_service import EvidenceService
+from services.label_service import LabelService
 from services.thread_service import ThreadService, cleanup_thread_resources
 
 @dataclass(slots=True)
@@ -14,13 +15,15 @@ class Services:
     This makes dependencies explicit and easy to override in tests.
     """
     chat: ChatService
-    orchestrator: AgentOrchestrator
+    label: LabelService
+    evidence: EvidenceService
     thread_configs: ThreadService
 
 
 def build_services(*, max_threads: int = 50) -> Services:
     chat = ChatService()
-    orchestrator = AgentOrchestrator()
+    label = LabelService()
+    evidence = EvidenceService()
     thread_configs = ThreadService(
         max_threads=max_threads,
         cleanup_callback=lambda thread_id: cleanup_thread_resources(thread_id, chat),
@@ -28,6 +31,7 @@ def build_services(*, max_threads: int = 50) -> Services:
 
     return Services(
         chat=chat,
-        orchestrator=orchestrator,
+        label=label,
+        evidence=evidence,
         thread_configs=thread_configs,
     )

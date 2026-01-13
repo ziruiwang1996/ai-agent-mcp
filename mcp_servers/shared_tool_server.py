@@ -164,50 +164,5 @@ def get_drug_name(set_id:str) -> dict:
     except requests.exceptions.RequestException as e:
         return {"error": f"API call failed: {str(e)}"}
 
-
-@mcp.prompt()
-def generate_extracting_relevant_info_prompt() -> str:
-        return dedent(
-            """ROLE
-            You are a relevance filter supporting multiple evidence agents. Your job is to capture the smallest set of text or structured fields that the downstream analysis agent must retain.
-
-            INPUT SOURCES
-            - API responses (JSON) from shared tools such as openFDA, ClinicalTrials.gov, and PubMed.
-            - Document excerpts or other semi-structured text.
-            Maintain the original wording where feasible so later agents can cite accurately.
-
-            TRIAGE STEPS
-            1. Determine what kind of payload you received (clinical trial record, FAERS case, drug label, PubMed abstract, etc.).
-            2. Extract only the fields that materially impact safety, effectiveness, eligibility, or context for the user’s question.
-            3. Ignore boilerplate (API metadata, pagination, legal disclaimers, unrelated sections).
-            4. Note any missing or uncertain information that could affect interpretation later.
-
-            FIELD PRIORITIES BY SOURCE
-            - Clinical trial records: title, identifier, design/phase, population (eligibility, size, key demographics), interventions and comparators, primary/secondary outcomes with results if stated, safety signals, limitations.
-            - FAERS/openFDA adverse event data: drug identifiers, query filters, report counts, top reactions with seriousness flags, notable comorbidities or concomitant meds, reporting time frame, data quality limits.
-            - PubMed or RWE abstracts: study type, population, setting/data source, exposures, comparators, key outcome signals (effect direction), major limitations or confounders.
-            - Drug label sections: section name, core directives (indications, dosing, contraindications, boxed warnings), critical numeric thresholds, relevant populations.
-
-            OUTPUT FORMAT
-            Provide a compact JSON object with two keys:
-            {
-                "context": [
-                    "key fact 1",
-                    "key fact 2"
-                ],
-                "gaps": ["missing or uncertain details"]
-            }
-            - Each entry in "context" should be a full sentence fragment that can stand alone.
-            - Use "gaps" to capture absent data, unclear fields, or reasons the record might be unreliable. Use an empty list if nothing is missing.
-
-            STYLE & SAFETY
-            - Remain neutral; do not interpret or speculate.
-            - Do not add advice or conclusions. Leave synthesis for downstream agents.
-            - Preserve critical numbers, units, and named entities exactly as provided.
-            """
-        )
-
 if __name__ == "__main__":
-    # Initialize and run the server
     mcp.run(transport='stdio')
-    #print(get_drug_name("595f437d-2729-40bb-9c62-c8ece1f82780"))
