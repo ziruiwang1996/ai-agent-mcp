@@ -1,94 +1,75 @@
+
 # Med Helper Agent Server
 
-A FastAPI service that wraps a LangGraph-powered chat agent and a set of Model Context Protocol (MCP) servers for medication safety research. The server orchestrates Google Gemini models with purpose-built analysis prompts, thread-scoped retrieval-augmented generation (RAG), and domain-specific tooling for drug labels, adverse event reports, clinical trials, and real-world evidence.
+A FastAPI service for medication safety research, combining a LangGraph-powered chat agent with Model Context Protocol (MCP) servers. It supports Google Gemini models, retrieval-augmented generation (RAG), and domain-specific tools for drug labels, adverse events, clinical trials, and real-world evidence.
 
-## Table of Contents
-- [Features](#features)
-- [Architecture Overview](#architecture-overview)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Running the API](#running-the-api)
-- [API Overview](#api-overview)
-  - [Root and Health](#root-and-health)
-  - [Chat Workflow](#chat-workflow)
-  - [Document Management](#document-management)
-  - [Tool Discovery](#tool-discovery)
-  - [Label Interpretation](#label-interpretation)
-  - [Evidence Reports](#evidence-reports)
-- [MCP Servers and Tools](#mcp-servers-and-tools)
-- [Development and Testing](#development-and-testing)
-- [Troubleshooting](#troubleshooting)
+## Quick Start
 
-## Features
-- Google Gemini 2.5 Flash chat model managed through LangChain's `init_chat_model` and cached by `ModelRegistry`.
-- LangGraph state machine with checkpointing (`MemorySaver`) that enables agentic tool use and streaming responses per conversation thread.
-- Thread-scoped RAG: PDF, TXT, Markdown, and DOCX uploads are chunked, embedded with Google Generative AI embeddings, and stored in in-memory vector stores keyed by `thread_id`.
-- Multi-agent orchestrator that can assemble evidence reports by coordinating label, FAERS, clinical trial, and PubMed analysis agents plus a summarizer.
-- Rich MCP server suite exposing FDA label data, FAERS queries, clinical trial searches, PubMed real-world evidence retrieval, shared utilities, and carefully crafted analysis prompts.
-- Service container pattern (`services/container.py`) that centralizes long-lived services (chat, orchestrator, thread cache) for easy dependency injection and testing.
+1. **Clone and set up environment:**
+   ```bash
+   git clone <repo-url>
+   cd agent-server
+   python3 -m venv server-env
+   source server-env/bin/activate
+   pip install -r requirements.txt
+   ```
+2. **Configure environment variables:**
+   - Create a `.env` file with:
+     ```
+     GOOGLE_API_KEY=your-gemini-api-key
+     MERRIAM_WEBSTER_API_KEY=optional
+     ```
+3. **Run the API:**
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+   - Docs: http://localhost:8000/docs
 
-## Architecture Overview
-1. **FastAPI application** (`main.py`)
-   - Configures CORS, registers routers, and bootstraps shared services on startup.
-2. **Services layer** (`services/`)
-   - `ChatService` owns the LangGraph chat agent and document RAG helpers.
-   - `AgentOrchestrator` lazily initializes specialized MCP agents for evidence synthesis.
-   - `ThreadService` tracks per-thread LangGraph configuration and eviction cleanup.
-3. **API layer** (`api/`)
-   - `/api/chat` for initialization, batch responses, SSE streaming, resets, and document upload/list/clear.
-   - `/api/tools` for introspecting tool availability by agent.
-   - `/api/interpret` for patient-friendly FDA label section summaries.
-   - `/api/evidence` placeholder routes where orchestrated evidence reports will be exposed.
-4. **Agent layer** (`agent/`)
-   - `ChatAgent` extends `MCPAgent`, wiring LangGraph workflow, RAG integration, and tool execution loop.
-   - `model_registry.py` resolves Google Gemini or optional HuggingFace models via environment-driven configuration.
-5. **MCP servers** (`mcp_servers/`)
-   - Standalone FastMCP entry points that expose HTTP integrations, local references, and analysis prompts for each research domain.
+## Core Features
+
+- Chat agent with Google Gemini (via LangGraph)
+- Thread-scoped RAG: upload and query PDFs, TXT, Markdown, DOCX
+- Multi-agent orchestration for evidence synthesis
+- MCP servers for FDA label, FAERS, clinical trials, PubMed, and shared tools
+
+## API Endpoints (Highlights)
+
+- `POST /api/chat/initialize` – Start a new chat thread
+- `POST /api/chat/batch` – Send messages to the agent
+- `POST /api/chat/stream` – Stream responses (SSE)
+- `POST /api/chat/documents/upload` – Upload documents for RAG
+- `GET /api/tools` – List available tools by agent
+- `POST /api/interpret` – Get plain-language FDA label summaries
+
+See Swagger UI for full API details.
 
 ## Project Structure
+
 ```
-agent-server/
-├── main.py
-├── requirements.txt
-├── Dockerfile
-├── docker-entrypoint.sh
-├── render.yaml
-├── agent/
-│   ├── __init__.py
-│   ├── chat_agent.py
-│   ├── mcp_agent.py
-│   └── model_registry.py
-├── api/
-│   ├── __init__.py
-│   ├── chat.py
-│   ├── evidence.py
-│   ├── interpret.py
-│   └── tools.py
-├── assets/
-│   ├── drug_adverse_event_fields.yaml
-│   └── drug_labeling_fields.yaml
-├── mcp_servers/
-│   ├── adverse_event_server.py
-│   ├── clinical_trial_server.py
-│   ├── drug_label_server.py
-│   ├── pubmed_server.py
-│   ├── shared_tool_server.py
-│   └── mcp_server_config.json
-├── services/
-│   ├── __init__.py
-│   ├── agent_orchestrator.py
-│   ├── chat_service.py
-│   ├── container.py
-│   └── thread_service.py
-├── tests/
-│   ├── check_thread_status.py
-│   ├── test_api.py
-│   ├── test_rag.py
-│   └── test_rag_debug.py
-├── requirements.txt
-└── server-env/
-    └── ... (local virtual environment, optional)
+main.py
+requirements.txt
+agent/           # Chat agent, model registry
+api/             # FastAPI routers
+assets/          # Field definitions
+mcp_servers/     # Domain-specific MCP servers
+services/        # Service container, orchestrator, thread management
+tests/           # Pytest-based tests
 ```
+
+## Development
+
+- Format/lint: use `ruff`, `black`, etc. (not bundled)
+- Run tests: `pytest`
+- Logging: via `uvicorn.error`
+
+## Troubleshooting
+
+- Missing API key: check `.env` and environment variables
+- Chat not initialized: call `/api/chat/initialize` first
+- RAG not working: ensure documents are uploaded and listed
+
+---
+For details on MCP server endpoints and prompts, see the code in `mcp_servers/`.
 
 ## Getting Started
 ### Prerequisites
