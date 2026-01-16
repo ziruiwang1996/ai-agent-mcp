@@ -19,6 +19,27 @@ def expand_env_in_text(text: str) -> str:
         return val
     return pattern.sub(repl, text)
 
+def _coerce_prompt_to_string(value: Any) -> Optional[str]:
+    """Best-effort conversion of MCP prompt payloads into plain strings."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if hasattr(value, "content"):
+        return _coerce_prompt_to_string(getattr(value, "content", None))
+    if isinstance(value, dict):
+        return _coerce_prompt_to_string(value.get("content"))
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            text = _coerce_prompt_to_string(item)
+            if isinstance(text, str) and text:
+                parts.append(text)
+        if parts:
+            return "\n".join(parts)
+        return None
+    return None
+
 class MCPAgent:
     def __init__(
         self,
@@ -44,14 +65,40 @@ class MCPAgent:
                 expanded_config = expand_env_in_text(raw_config)
                 config = json.loads(expanded_config)
                 servers = config.get(self.mcp_config_key, {})
-
                 client = MultiServerMCPClient(servers)
-                self.tools = await client.get_tools()
+
+                try:
+                    self.tools = await client.get_tools()
+                except Exception as tool_err:
+                    print(f"Warning initializing MCP tools: {tool_err}")
+                    self.tools = []
+
                 for server_name in servers.keys():
-                    prompts = await client.get_prompt(server_name, "get_system_prompt")
-                    if prompts:
-                        self.system_prompt = prompts[0]
-                    self.resources.extend(await client.get_resources(server_name))
+                    prompts = []
+                    try:
+                        prompts = await client.get_prompt(server_name, "generate_system_prompt")
+                        if prompts:
+                            prompt_value = prompts[0]
+                            extracted_prompt = _coerce_prompt_to_string(prompt_value)
+                            if extracted_prompt:
+                                self.system_prompt = extracted_prompt
+                                break
+                            else:
+                                print(
+                                    f"Warning: unsupported prompt payload from {server_name}: {type(prompt_value).__name__}"
+                                )
+                    except Exception as prompt_err:
+                        print(
+                            f"Warning retrieving system prompt from {server_name}: {prompt_err}"
+                        )
+
+                    try:
+                        resources = await client.get_resources(server_name)
+                        self.resources.extend(resources)
+                    except Exception as resource_err:
+                        print(
+                            f"Warning retrieving resources from {server_name}: {resource_err}"
+                        )
         except Exception as e:
             print(f"Error initializing MCP client: {e}")
 
@@ -74,7 +121,7 @@ class MCPAgent:
         try:
             messages = [HumanMessage(content=user_input)]
             response = await self.agent.ainvoke({"messages": messages})
-            # print(f"Agent response: {response}")
+            print(f"Agent response: {response}")
             last = response.get("messages", [])[-1] if response.get("messages") else None
             response = getattr(last, "content", "No response generated") if last else "No response generated"
             return response

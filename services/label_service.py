@@ -19,6 +19,7 @@ class WorkflowState(TypedDict, total=False):
     section_name: str
     section_content: str
     interpretation: str
+    explanation: str
 
 class LabelService:
     def __init__(self):
@@ -53,14 +54,15 @@ class LabelService:
     async def _run_explainer(self, state: WorkflowState) -> WorkflowState:
         explainer = await self._agent_registry.resolve("explainer_agent")
         input_prompt = (
-            "Generate a patient-facing explanation using the evidence pack.\n"
-            "explain in comment language, (explain)"
+            "Generate a patient-facing, plain explanation using the label interpretation.\n"
+            f"Drug: {state['drug_name']}\n\n"
+            f"Interpretation: {state['interpretation']}\n\n"
         )
         out = await self._execute_step("explainer", explainer, input_prompt)
         if out["status"] == "success":
-            return {"answer": out["output"]}
+            return {"explanation": out["output"]}
         else:
-            return {"answer": out["error"]}
+            return {"explanation": out["error"]}
 
     async def _execute_step(self, step_name: str, step_instance: MCPAgent, input_data: str) -> Dict[str, Any]:
         """Execute a single step with error handling."""
@@ -80,6 +82,9 @@ class LabelService:
                 "error": str(e),
             }
         
-    async def execute_workflow(self, input_data: Dict[str, Any]) -> str:
-        output = await self.app.ainvoke(input_data)
-        return output['interpretation']
+    async def execute_workflow(self, input_data: Dict[str, Any], *, thread_id: str) -> str:
+        if not thread_id:
+            raise ValueError("thread_id is required for label workflow execution")
+        config = {"configurable": {"thread_id": thread_id}}
+        output = await self.app.ainvoke(input_data, config=config)
+        return output['explanation']

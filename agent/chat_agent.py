@@ -24,10 +24,10 @@ class ChatAgent(MCPAgent):
         self,
         chat_model: BaseChatModel,
         mcp_config_key: str,
-        system_message: str,
+        system_prompt: str,
         embedding: str
     ):
-        super().__init__(chat_model, mcp_config_key, system_message)
+        super().__init__(chat_model, mcp_config_key, system_prompt)
         self.timeout: int = 60 
         self.trimmer: list[BaseMessage] = None
         self.embedding_model: Any = GoogleGenerativeAIEmbeddings(model=embedding)
@@ -168,7 +168,7 @@ class ChatAgent(MCPAgent):
                 
                 rag_prompt = ChatPromptTemplate.from_messages([
                     ("system", 
-                     f"{self.system_message}\n\n"
+                     f"{self.system_prompt}\n\n"
                      "You have access to document excerpts that may be relevant to the user's question.\n\n"
                      "RELEVANT DOCUMENT CONTEXT:\n"
                      "═══════════════════════════════════════\n"
@@ -189,7 +189,7 @@ class ChatAgent(MCPAgent):
             else:
                 print("RAG: No relevant documents retrieved despite should_retrieve=True")
                 base_prompt = ChatPromptTemplate.from_messages([
-                    ("system", self.system_message),
+                    ("system", self.system_prompt),
                     MessagesPlaceholder(variable_name="messages"),
                 ])
                 messages_no_system = [m for m in trimmed_messages if not isinstance(m, SystemMessage)]
@@ -198,7 +198,7 @@ class ChatAgent(MCPAgent):
             # Standard prompt (no RAG)
             print(f"RAG: Skipped retrieval (query not deemed document-related)")
             base_prompt = ChatPromptTemplate.from_messages([
-                ("system", self.system_message),
+                ("system", self.system_prompt),
                 MessagesPlaceholder(variable_name="messages"),
             ])
             messages_no_system = [m for m in trimmed_messages if not isinstance(m, SystemMessage)]

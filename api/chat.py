@@ -2,7 +2,6 @@ import json
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import uuid
 from services.container import Services
 from pathlib import Path
 import tempfile
@@ -64,9 +63,7 @@ class ResetResponse(BaseModel):
 async def initialize_chat(init_request: InitializeRequest, request: Request):
     services = _get_services(request)
 
-    thread_id = init_request.thread_id or ""
-    if thread_id == "":
-        thread_id = str(uuid.uuid4())
+    thread_id = _require_thread_id(init_request.thread_id or "")
 
     logger.info("POST /api/chat/initialize thread_id=%s", thread_id)
 

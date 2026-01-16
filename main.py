@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from services.container import Services, build_services
 from api import chat, interpret, tools, evidence
+from pydantic import BaseModel
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,7 +29,7 @@ app.add_middleware(
 async def root():
     return {"message": "Hello, this is the Med Helper server."}
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     services_obj: Services | None = getattr(app.state, "services", None)
@@ -40,9 +41,17 @@ async def health_check():
         "thread_cache": services_obj.thread_configs.get_stats(),
     }
 
-@app.get("/threads/stats")
+@app.get("/api/threads/stats")
 async def get_thread_stats():
     services_obj: Services | None = getattr(app.state, "services", None)
     if services_obj is None:
         return {"cache_info": None, "message": "services not initialized"}
     return {"cache_info": services_obj.thread_configs.get_stats(), "message": "Thread cache statistics"}
+
+class APIKeyRequest(BaseModel):
+    key: str
+    provider: str
+
+@app.post("/api/setkey")
+def set_api_key(payload: APIKeyRequest):
+    pass

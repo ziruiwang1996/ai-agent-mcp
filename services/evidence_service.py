@@ -18,7 +18,9 @@ class WorkflowState(TypedDict, total=False):
     set_id: str
     drug_name: str
     user_profile: Dict[str, Any]  # e.g., age/sex/conditions
-    evidence: Dict[str, Any]
+    faers_evidence: Any
+    rwe_evidence: Any
+    clinical_trials_evidence: Any
     explanations: Dict[str, str]
     summary: str
     join_ready: bool
@@ -89,11 +91,6 @@ class EvidenceService:
                 "error": str(e),
             }
 
-    def _merge_evidence(self, state: WorkflowState, key: str, value: Any) -> Dict[str, Any]:
-        existing = dict(state.get("evidence") or {})
-        existing[key] = value
-        return existing
-        
     def generate_input_prompt(self, state: WorkflowState) -> str:
         user_profile = state.get("user_profile", {})
         return (
@@ -113,38 +110,31 @@ class EvidenceService:
         faers_agent = await self._agent_registry.resolve("faers_agent")
         input_prompt = self.generate_input_prompt(state)
         out = await self._execute_step("faers_agent", faers_agent, input_prompt)
-        evidence = self._merge_evidence(
-            state,
-            "faers_adverse_event_reports",
-            out["output"] if out["status"] == "success" else out["error"],
-        )
-        return {"evidence": evidence}
+        result = out["output"] if out["status"] == "success" else out["error"]
+        return {"faers_evidence": result}
     
     async def _run_rwe_agent(self, state: WorkflowState) -> WorkflowState:
         rwe_agent = await self._agent_registry.resolve("rwe_agent")
         input_prompt = self.generate_input_prompt(state)
         out = await self._execute_step("rwe_agent", rwe_agent, input_prompt)
-        evidence = self._merge_evidence(
-            state,
-            "real_world_evidence_studies",
-            out["output"] if out["status"] == "success" else out["error"],
-        )
-        return {"evidence": evidence}
+        result = out["output"] if out["status"] == "success" else out["error"]
+        return {"rwe_evidence": result}
     
     async def _run_clinical_trials_agent(self, state: WorkflowState) -> WorkflowState:
         clinical_trials_agent = await self._agent_registry.resolve("clinical_trials_agent")
         input_prompt = self.generate_input_prompt(state)
         out = await self._execute_step("clinical_trials_agent", clinical_trials_agent, input_prompt)
-        evidence = self._merge_evidence(
-            state,
-            "clinical_trials_studies",
-            out["output"] if out["status"] == "success" else out["error"],
-        )
-        return {"evidence": evidence}
+        result = out["output"] if out["status"] == "success" else out["error"]
+        return {"clinical_trials_evidence": result}
     
     async def _run_explainer(self, state: WorkflowState) -> WorkflowState:
         explainer = await self._agent_registry.resolve("explainer_agent")
-        evidence_sources = state.get("evidence") or {}
+        evidence_sources = {
+            "faers_adverse_event_reports": state.get("faers_evidence"),
+            "real_world_evidence_studies": state.get("rwe_evidence"),
+            "clinical_trials_studies": state.get("clinical_trials_evidence"),
+        }
+        evidence_sources = {k: v for k, v in evidence_sources.items() if v is not None}
         if not evidence_sources:
             return {"explanations": {}}
 
@@ -186,15 +176,15 @@ class EvidenceService:
             raise RuntimeError(f"Error executing step summarization: {str(e)}") from e
         
     def _join_reports(self, state: WorkflowState) -> WorkflowState:
-        required = {
-            "faers_adverse_event_reports", 
-            "real_world_evidence_studies", 
-            "clinical_trials_studies"
-        }
+        required = (
+            state.get("faers_evidence"),
+            state.get("rwe_evidence"),
+            state.get("clinical_trials_evidence"),
+        )
         if state.get("explainer_started") is True:
             return {}
         # Check if all three collector outputs exist in state (success or failure payload)
-        if required.issubset(state.get("evidence", {}).keys()):
+        if all(val is not None for val in required):
             return {"explainer_started": True, "join_ready": True}
         # Not ready yet
         return {"join_ready": False}
@@ -204,7 +194,11 @@ class EvidenceService:
             return "explain"
         return "wait"
 
-    async def execute_workflow(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_workflow(self, input_data: Dict[str, Any], *, thread_id: str) -> Dict[str, Any]:
+        if not thread_id:
+            raise ValueError("thread_id is required for evidence workflow execution")
+        config = {"configurable": {"thread_id": thread_id}}
+
         user_profile = {
             "age": input_data.get('age'),
             "sex": input_data.get('sex'),
@@ -219,7 +213,8 @@ class EvidenceService:
                 "set_id": input_data.get("drug_set_id", ""),
                 "drug_name": input_data.get("drug_name", ""),
                 "user_profile": user_profile
-            }
+            }, 
+            config=config
         )
         explanations = output.get("explanations") or {}
         return {

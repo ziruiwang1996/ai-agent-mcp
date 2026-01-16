@@ -27,9 +27,9 @@ class ChatService:
         chat_model = self._model_registry.resolve("gemini")
         agent = ChatAgent(
             chat_model,
-            mcp_server_name=self._mcp_server_name,
-            system_message=self._system_message,
-            embedding=self._embedding,
+            self._mcp_server_name,
+            self._system_message,
+            self._embedding,
         )
         await agent.initialize()
         self._chat_agent = agent
