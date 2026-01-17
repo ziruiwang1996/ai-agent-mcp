@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from services.container import Services
 
 router = APIRouter(prefix="/api/interpret")
+
 class InterpretationRequest(BaseModel):
     thread_id: str
     drug_name: str

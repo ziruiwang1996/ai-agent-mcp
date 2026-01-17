@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Dict, Union
+from typing import Union
 from agent.mcp_agent import MCPAgent
 from agent.model_registry import ModelRegistry
 
@@ -42,15 +42,37 @@ DEFAULT_AGENT_REGISTRY: dict[str, AgentSpec] = {
         chat_model_key="gemini",
         system_message="You are a medical content explainer agent.",
     ),
+    "chat_agent": AgentSpec(
+        key="chat_agent",
+        mcp_config_key="chat_agent",
+        chat_model_key="gemini",
+        system_message="You are a helpful medication expert. Answer all questions to the best of your ability.",
+    ),
 }
 
 class AgentRegistry:
-    def __init__(self, *, enable_cache: bool = True):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(AgentRegistry, cls).__new__(cls)
+            # Initialize attributes only once
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if getattr(self, '_initialized', False):
+            return
         self._registry: dict[str, AgentSpec] = DEFAULT_AGENT_REGISTRY
-        self._enable_cache = enable_cache
-        self._cache: Dict[str, MCPAgent] = {}
+        self._cache: dict[str, MCPAgent] = {}
         self._model_registry = ModelRegistry()
         self._init_locks: dict[str, asyncio.Lock] = {}
+
+    @staticmethod
+    def get_instance() -> "AgentRegistry":
+        if AgentRegistry._instance is None:
+            AgentRegistry._instance = AgentRegistry()
+        return AgentRegistry._instance
 
     async def _ensure_agent(self, spec: AgentSpec) -> MCPAgent:
         chat_model_instance = self._model_registry.resolve(spec.chat_model_key)
@@ -70,15 +92,14 @@ class AgentRegistry:
             cache_key = ref.key
             lock = self._init_locks.setdefault(cache_key, asyncio.Lock())
             async with lock:
-                if self._enable_cache and cache_key in self._cache:
+                if cache_key in self._cache:
                     return self._cache[cache_key]
                 agent_instance = await self._ensure_agent(ref)
-                if self._enable_cache:
-                    self._cache[cache_key] = agent_instance
+                self._cache[cache_key] = agent_instance
                 return agent_instance
         
         if isinstance(ref, str):
-            if self._enable_cache and ref in self._cache:
+            if ref in self._cache:
                 return self._cache[ref]
             if ref not in self._registry:
                 raise ValueError(
@@ -89,11 +110,10 @@ class AgentRegistry:
             spec = self._registry[ref]
             lock = self._init_locks.setdefault(ref, asyncio.Lock())
             async with lock:
-                if self._enable_cache and ref in self._cache:
+                if ref in self._cache:
                     return self._cache[ref]
                 agent_instance = await self._ensure_agent(spec)
-                if self._enable_cache:
-                    self._cache[ref] = agent_instance
+                self._cache[ref] = agent_instance
                 return agent_instance
 
         raise TypeError(f"Unsupported model reference type: {type(ref).__name__}")
@@ -105,3 +125,12 @@ class AgentRegistry:
 
     def keys(self) -> list[str]:
         return sorted(self._registry.keys())
+    
+    def initialized_agents(self) -> list:
+        return list(self._cache.keys())
+    
+    def is_agent_initialized(self, key: str) -> bool:
+        return key in self._cache
+    
+    def get_initialized_agent(self, key: str) -> MCPAgent | None:
+        return self._cache.get(key, None)

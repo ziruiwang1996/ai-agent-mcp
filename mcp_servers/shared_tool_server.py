@@ -1,7 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 from urllib.parse import urlparse
 from typing import Any, Optional
-from textwrap import dedent
 import requests
 
 mcp = FastMCP("shared_tool")

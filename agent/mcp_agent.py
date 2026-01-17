@@ -1,4 +1,3 @@
-from importlib import resources
 import re
 import os
 import json
@@ -6,7 +5,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_mcp_adapters.client import MultiServerMCPClient  
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
-from typing import Optional, List, Any
+from typing import Optional, Any
 from langgraph.graph.state import CompiledStateGraph
 
 def expand_env_in_text(text: str) -> str:
@@ -19,20 +18,20 @@ def expand_env_in_text(text: str) -> str:
         return val
     return pattern.sub(repl, text)
 
-def _coerce_prompt_to_string(value: Any) -> Optional[str]:
+def coerce_prompt_to_string(value: Any) -> Optional[str]:
     """Best-effort conversion of MCP prompt payloads into plain strings."""
     if value is None:
         return None
     if isinstance(value, str):
         return value
     if hasattr(value, "content"):
-        return _coerce_prompt_to_string(getattr(value, "content", None))
+        return coerce_prompt_to_string(getattr(value, "content", None))
     if isinstance(value, dict):
-        return _coerce_prompt_to_string(value.get("content"))
+        return coerce_prompt_to_string(value.get("content"))
     if isinstance(value, list):
         parts: list[str] = []
         for item in value:
-            text = _coerce_prompt_to_string(item)
+            text = coerce_prompt_to_string(item)
             if isinstance(text, str) and text:
                 parts.append(text)
         if parts:
@@ -50,12 +49,12 @@ class MCPAgent:
         self.chat_model: BaseChatModel = chat_model
         self.mcp_config_key: str = mcp_config_key
 
-        self.system_prompt: Optional[Any] = system_prompt
-        self.tools: List[Any] = []
+        self.system_prompt: Optional[str] = system_prompt
+        self.tools: list[Any] = []
         self.resources: list[Any] = []
         self.agent: Optional[CompiledStateGraph] = None
 
-    async def initialize_mcp_client(self) -> None:
+    async def _initialize_mcp_client(self) -> None:
         try:
             config_file_path = os.path.abspath(
                 os.path.join(os.path.dirname(__file__), "..", "mcp_servers", "mcp_server_config.json")
@@ -79,7 +78,7 @@ class MCPAgent:
                         prompts = await client.get_prompt(server_name, "generate_system_prompt")
                         if prompts:
                             prompt_value = prompts[0]
-                            extracted_prompt = _coerce_prompt_to_string(prompt_value)
+                            extracted_prompt = coerce_prompt_to_string(prompt_value)
                             if extracted_prompt:
                                 self.system_prompt = extracted_prompt
                                 break
@@ -104,7 +103,7 @@ class MCPAgent:
 
     async def initialize(self) -> None:
         try:
-            await self.initialize_mcp_client()
+            await self._initialize_mcp_client()
             self.agent = create_agent(
                 model=self.chat_model, 
                 tools=self.tools,

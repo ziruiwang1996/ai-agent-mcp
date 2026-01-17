@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Any, Callable
 
 class _ThreadDocumentCleaner:
     def clear_thread_documents(self, thread_id: str) -> None:
@@ -70,10 +70,10 @@ class ThreadService:
         if max_threads <= 0:
             raise ValueError(f"max_threads must be positive, got {max_threads}")
         self.max_threads = max_threads
-        self.cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+        self.cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self.cleanup_callback = cleanup_callback
     
-    def get(self, thread_id: str) -> Optional[Dict[str, Any]]:
+    def get(self, thread_id: str) -> Optional[dict[str, Any]]:
         """
         Get thread config and mark as recently used.
         """
@@ -82,7 +82,7 @@ class ThreadService:
             return self.cache[thread_id]
         return None
     
-    def set(self, thread_id: str, config: Dict[str, Any]) -> None:
+    def set(self, thread_id: str, config: dict[str, Any]) -> None:
         """
         Add or update thread config.
         If thread exists: Updates config and marks as recently used.
@@ -157,7 +157,7 @@ class ThreadService:
         """Get current number of threads in cache."""
         return len(self.cache)
     
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get cache statistics.
         
@@ -184,7 +184,7 @@ class ThreadService:
         """
         return list(self.cache.keys())
     
-    def get_all(self) -> Dict[str, Dict[str, Any]]:
+    def get_all(self) -> dict[str, dict[str, Any]]:
         """
         Get all threads as a dictionary.
         

@@ -1,3 +1,16 @@
+import certifi
+import os
+import sys
+from pathlib import Path
+# Align Python SSL clients with certifi so async HTTPS calls succeed in dev/runtime.
+_CERT_PATH = certifi.where()
+os.environ.setdefault("SSL_CERT_FILE", _CERT_PATH)
+os.environ.setdefault("REQUESTS_CA_BUNDLE", _CERT_PATH)
+# Provide sane defaults when the orchestrator runs outside container tooling.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+os.environ.setdefault("APP_PATH", str(_PROJECT_ROOT))
+os.environ.setdefault("PYTHON_PATH", sys.executable)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager

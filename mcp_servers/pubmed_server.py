@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 import requests
 from mcp.server.fastmcp import FastMCP
 import xml.etree.ElementTree as ET
@@ -17,7 +17,7 @@ def search_pubmed_real_world_clinical_studies(
     sex: Optional[str] = None,
     setting: Optional[str] = None,
     years_back: int = 15,
-) -> List[str]:
+) -> list[str]:
     """Search PubMed for *real‑world* or clinically relevant evidence about a drug for a condition.
 
     This tool is intended for an agent to:

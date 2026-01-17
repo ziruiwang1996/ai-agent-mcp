@@ -1,45 +1,64 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Union
+from typing import Any, Mapping, Union
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 import os
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
-import certifi
-
-# Align Python SSL clients with certifi so async HTTPS calls succeed in dev/runtime.
-_CERT_PATH = certifi.where()
-os.environ.setdefault("SSL_CERT_FILE", _CERT_PATH)
-os.environ.setdefault("REQUESTS_CA_BUNDLE", _CERT_PATH)
 
 @dataclass(frozen=True)
 class ModelSpec:
     name: str
     provider: str
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 DEFAULT_MODEL_REGISTRY: Mapping[str, ModelSpec] = {
-    "gemini": ModelSpec(name="gemini-2.5-flash", provider="google_genai"),
-    # "med_gemma": ModelSpec(name="google/medgemma-4b-it", provider=""),
-    # "tx_gemma": ModelSpec(name="google/txgemma-9b-chat", provider=""),
-    "summarizer": ModelSpec(name="google/bigbird-pegasus-large-arxiv", provider="hf-inference"),
+    "gemini": ModelSpec(
+        name="gemini-2.5-flash", 
+        provider="google_genai"
+    ),
+    "med_gemma": ModelSpec(
+        name="google/medgemma-4b-it", 
+        provider="local_inference"),
+    "tx_gemma": ModelSpec(
+        name="google/txgemma-9b-chat", 
+        provider="local_inference"),
+    "summarizer": ModelSpec(
+        name="google/bigbird-pegasus-large-arxiv", 
+        provider="hf_inference"),
     "openai": ModelSpec(
         name="openai/gpt-oss-20b", 
-        provider="huggingface", 
+        provider="hf_endpoint", 
         kwargs={"task": "text-generation", "max_new_tokens": 1024}),
 }
 
 class ModelRegistry:
-    def __init__(self, *, enable_cache: bool = True):
-        self._registry: Mapping[str, ModelSpec] = DEFAULT_MODEL_REGISTRY
-        self._enable_cache = enable_cache
-        self._cache: Dict[str, BaseChatModel | InferenceClient] = {}
+    _instance = None
 
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(ModelRegistry, cls).__new__(cls)
+            # Initialize attributes only once
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if getattr(self, '_initialized', False):
+            return
+        self._registry: Mapping[str, ModelSpec] = DEFAULT_MODEL_REGISTRY
+        self._cache: dict[str, BaseChatModel | InferenceClient] = {}
+        self._initialized = True
+
+    @staticmethod
+    def get_instance() -> "ModelRegistry":
+        if ModelRegistry._instance is None:
+            ModelRegistry._instance = ModelRegistry()
+        return ModelRegistry._instance
+    
     def resolve(self, ref: Union[str, ModelSpec, BaseChatModel, InferenceClient]) -> BaseChatModel | InferenceClient:
         """Resolve a model reference into a concrete LangChain chat model.
-
         Accepted refs:
         - BaseChatModel: returned as-is
         - str: treated as a registry key (e.g. "gemini")
@@ -52,18 +71,17 @@ class ModelRegistry:
             return ref
 
         if isinstance(ref, ModelSpec):
-            if ref.provider == "hf-inference":
+            if ref.provider == "hf_inference":
                 model_instance = self._via_inference_client(ref)
-            elif ref.provider == "huggingface":
+            elif ref.provider == "hf_endpoint":
                 model_instance = self._via_huggingface_endpoint(ref)
             else:
                 model_instance = self._via_init_chat_model(ref)
-            if self._enable_cache:
-                self._cache[ref.name] = model_instance
+            self._cache[ref.name] = model_instance
             return model_instance
 
         if isinstance(ref, str):
-            if self._enable_cache and ref in self._cache:
+            if ref in self._cache:
                 return self._cache[ref]
             if ref not in self._registry:
                 raise ValueError(
@@ -72,14 +90,13 @@ class ModelRegistry:
                     "Pass a BaseChatModel to override directly, or a ModelSpec(name=..., provider=...)."
                 )
             spec = self._registry[ref]
-            if spec.provider == "hf-inference":
+            if spec.provider == "hf_inference":
                 model_instance = self._via_inference_client(spec)
-            elif spec.provider == "huggingface":
+            elif spec.provider == "hf_endpoint":
                 model_instance = self._via_huggingface_endpoint(spec)
             else:
                 model_instance = self._via_init_chat_model(spec)
-            if self._enable_cache:
-                self._cache[ref] = model_instance
+            self._cache[ref] = model_instance
             return model_instance
 
         raise TypeError(f"Unsupported model reference type: {type(ref).__name__}")
@@ -91,6 +108,9 @@ class ModelRegistry:
 
     def keys(self) -> list[str]:
         return sorted(self._registry.keys())
+    
+    def available_models(self) -> list:
+        return list(self._cache.keys())
     
     def _via_huggingface_endpoint(self, spec: ModelSpec) -> ChatHuggingFace:
         load_dotenv()

@@ -1,18 +1,9 @@
 from __future__ import annotations
-import os
-import sys
-from pathlib import Path
-from typing import Any, Dict, TypedDict
+from typing import Any, TypedDict
 from agent.agent_registry import AgentRegistry
 from agent.mcp_agent import MCPAgent
 from agent.model_registry import ModelRegistry
 from langgraph.graph import START, END, StateGraph
-from langgraph.checkpoint.memory import MemorySaver
-
-# Provide sane defaults when the orchestrator runs outside container tooling.
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-os.environ.setdefault("APP_PATH", str(_PROJECT_ROOT))
-os.environ.setdefault("PYTHON_PATH", sys.executable)
 
 class WorkflowState(TypedDict, total=False):
     drug_name: str
@@ -23,12 +14,12 @@ class WorkflowState(TypedDict, total=False):
 
 class LabelService:
     def __init__(self):
-        self._model_registry = ModelRegistry()
-        self._agent_registry = AgentRegistry()
+        self._model_registry = ModelRegistry.get_instance()
+        self._agent_registry = AgentRegistry.get_instance()
 
         self._workflow = StateGraph(WorkflowState)
         self._register_nodes()
-        self.app = self._workflow.compile(checkpointer=MemorySaver())
+        self.app = self._workflow.compile()
     
     def _register_nodes(self) -> None:
         self._workflow.add_node("interpreter_agent", self._run_label_interpreter)
@@ -64,7 +55,7 @@ class LabelService:
         else:
             return {"explanation": out["error"]}
 
-    async def _execute_step(self, step_name: str, step_instance: MCPAgent, input_data: str) -> Dict[str, Any]:
+    async def _execute_step(self, step_name: str, step_instance: MCPAgent, input_data: str) -> dict[str, Any]:
         """Execute a single step with error handling."""
         try:
             output = await step_instance.process_input(input_data)
@@ -82,9 +73,6 @@ class LabelService:
                 "error": str(e),
             }
         
-    async def execute_workflow(self, input_data: Dict[str, Any], *, thread_id: str) -> str:
-        if not thread_id:
-            raise ValueError("thread_id is required for label workflow execution")
-        config = {"configurable": {"thread_id": thread_id}}
-        output = await self.app.ainvoke(input_data, config=config)
+    async def execute_workflow(self, input_data: dict[str, Any]) -> str:
+        output = await self.app.ainvoke(input_data)
         return output['explanation']

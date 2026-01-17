@@ -26,7 +26,7 @@ class EvidenceResponse(BaseModel):
     clinical_trials_explanation: str
     summary: str
 
-@router.post("", response_model=EvidenceResponse)
+@router.post("/", response_model=EvidenceResponse)
 async def generate_evidence_report(payload: EvidenceRequest, request: Request):
     services: Services | None = getattr(request.app.state, "services", None)
     if services is None:

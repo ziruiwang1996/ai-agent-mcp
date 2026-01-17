@@ -1,39 +1,30 @@
 from __future__ import annotations
-import os
-import sys
-from pathlib import Path
-from typing import Any, Dict, TypedDict
+from typing import Any, TypedDict
 from agent.agent_registry import AgentRegistry
 from agent.mcp_agent import MCPAgent
 from agent.model_registry import ModelRegistry
 from langgraph.graph import START, END, StateGraph
-from langgraph.checkpoint.memory import MemorySaver
-
-# Provide sane defaults when the orchestrator runs outside container tooling.
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-os.environ.setdefault("APP_PATH", str(_PROJECT_ROOT))
-os.environ.setdefault("PYTHON_PATH", sys.executable)
 
 class WorkflowState(TypedDict, total=False):
     set_id: str
     drug_name: str
-    user_profile: Dict[str, Any]  # e.g., age/sex/conditions
+    user_profile: dict[str, Any]  # e.g., age/sex/conditions
     faers_evidence: Any
     rwe_evidence: Any
     clinical_trials_evidence: Any
-    explanations: Dict[str, str]
+    explanations: dict[str, str]
     summary: str
     join_ready: bool
     explainer_started: bool
 
 class EvidenceService:
     def __init__(self):
-        self._model_registry = ModelRegistry()
-        self._agent_registry = AgentRegistry()
+        self._model_registry = ModelRegistry.get_instance()
+        self._agent_registry = AgentRegistry.get_instance()
 
         self._workflow = StateGraph(WorkflowState)
         self._register_nodes()
-        self.app = self._workflow.compile(checkpointer=MemorySaver())
+        self.app = self._workflow.compile()
 
     def _register_nodes(self) -> None:
         # upstream resources collectors 
@@ -72,8 +63,8 @@ class EvidenceService:
             self, 
             step_name: str, 
             step_instance: MCPAgent, 
-            input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+            input_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute a single step with error handling."""
         try:
             output = await step_instance.process_input(input_data)
@@ -91,7 +82,7 @@ class EvidenceService:
                 "error": str(e),
             }
 
-    def generate_input_prompt(self, state: WorkflowState) -> str:
+    def _generate_input_prompt(self, state: WorkflowState) -> str:
         user_profile = state.get("user_profile", {})
         return (
             f"Drug name: {state.get('drug_name', '')}\n"
@@ -108,21 +99,21 @@ class EvidenceService:
 
     async def _run_faers_agent(self, state: WorkflowState) -> WorkflowState:
         faers_agent = await self._agent_registry.resolve("faers_agent")
-        input_prompt = self.generate_input_prompt(state)
+        input_prompt = self._generate_input_prompt(state)
         out = await self._execute_step("faers_agent", faers_agent, input_prompt)
         result = out["output"] if out["status"] == "success" else out["error"]
         return {"faers_evidence": result}
     
     async def _run_rwe_agent(self, state: WorkflowState) -> WorkflowState:
         rwe_agent = await self._agent_registry.resolve("rwe_agent")
-        input_prompt = self.generate_input_prompt(state)
+        input_prompt = self._generate_input_prompt(state)
         out = await self._execute_step("rwe_agent", rwe_agent, input_prompt)
         result = out["output"] if out["status"] == "success" else out["error"]
         return {"rwe_evidence": result}
     
     async def _run_clinical_trials_agent(self, state: WorkflowState) -> WorkflowState:
         clinical_trials_agent = await self._agent_registry.resolve("clinical_trials_agent")
-        input_prompt = self.generate_input_prompt(state)
+        input_prompt = self._generate_input_prompt(state)
         out = await self._execute_step("clinical_trials_agent", clinical_trials_agent, input_prompt)
         result = out["output"] if out["status"] == "success" else out["error"]
         return {"clinical_trials_evidence": result}
@@ -138,7 +129,7 @@ class EvidenceService:
         if not evidence_sources:
             return {"explanations": {}}
 
-        explanations: Dict[str, str] = {}
+        explanations: dict[str, str] = {}
         user_profile = state.get("user_profile")
         # Loop across evidence sources so each report receives a dedicated explainer pass.
         for source_name, payload in evidence_sources.items():
@@ -194,11 +185,7 @@ class EvidenceService:
             return "explain"
         return "wait"
 
-    async def execute_workflow(self, input_data: Dict[str, Any], *, thread_id: str) -> Dict[str, Any]:
-        if not thread_id:
-            raise ValueError("thread_id is required for evidence workflow execution")
-        config = {"configurable": {"thread_id": thread_id}}
-
+    async def execute_workflow(self, input_data: dict[str, Any]) -> dict[str, Any]:
         user_profile = {
             "age": input_data.get('age'),
             "sex": input_data.get('sex'),
@@ -213,8 +200,7 @@ class EvidenceService:
                 "set_id": input_data.get("drug_set_id", ""),
                 "drug_name": input_data.get("drug_name", ""),
                 "user_profile": user_profile
-            }, 
-            config=config
+            }
         )
         explanations = output.get("explanations") or {}
         return {

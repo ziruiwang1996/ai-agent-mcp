@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from services.chat_service import ChatService
 from services.evidence_service import EvidenceService
 from services.label_service import LabelService
+from services.vector_store_service import VectorStoreService
 from services.thread_service import ThreadService, cleanup_thread_resources
 
 @dataclass(slots=True)
@@ -17,6 +18,7 @@ class Services:
     chat: ChatService
     label: LabelService
     evidence: EvidenceService
+    documents: VectorStoreService 
     thread_configs: ThreadService
 
 
@@ -24,14 +26,16 @@ def build_services(*, max_threads: int = 50) -> Services:
     chat = ChatService()
     label = LabelService()
     evidence = EvidenceService()
+    documents = VectorStoreService()
     thread_configs = ThreadService(
         max_threads=max_threads,
-        cleanup_callback=lambda thread_id: cleanup_thread_resources(thread_id, chat),
+        cleanup_callback=lambda thread_id: cleanup_thread_resources(thread_id, documents),
     )
 
     return Services(
         chat=chat,
         label=label,
         evidence=evidence,
+        documents=documents,
         thread_configs=thread_configs,
     )
