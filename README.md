@@ -1,75 +1,74 @@
 
+
 # Med Helper Agent Server
 
-A FastAPI service for medication safety research, combining a LangGraph-powered chat agent with Model Context Protocol (MCP) servers. It supports Google Gemini models, retrieval-augmented generation (RAG), and domain-specific tools for drug labels, adverse events, clinical trials, and real-world evidence.
+FastAPI backend for medication safety research, featuring:
+- LangGraph-powered chat agent (Google Gemini)
+- Retrieval-augmented generation (RAG) with per-thread document context
+- Modular MCP servers for drug labels, adverse events, clinical trials, and evidence
 
 ## Quick Start
 
-1. **Clone and set up environment:**
-   ```bash
-   git clone <repo-url>
-   cd agent-server
-   python3 -m venv server-env
-   source server-env/bin/activate
-   pip install -r requirements.txt
-   ```
-2. **Configure environment variables:**
-   - Create a `.env` file with:
-     ```
-     GOOGLE_API_KEY=your-gemini-api-key
-     MERRIAM_WEBSTER_API_KEY=optional
-     ```
-3. **Run the API:**
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-   ```
-   - Docs: http://localhost:8000/docs
+1. Clone & install:
+  ```bash
+  git clone <repo-url>
+  cd agent-server
+  python3 -m venv server-env
+  source server-env/bin/activate
+  pip install -r requirements.txt
+  ```
+2. Configure `.env`:
+  ```
+  GOOGLE_API_KEY=your-gemini-api-key
+  MERRIAM_WEBSTER_API_KEY=optional
+  ```
+3. Launch:
+  ```bash
+  uvicorn main:app --reload
+  ```
+  Docs: http://localhost:8000/docs
 
 ## Core Features
-
-- Chat agent with Google Gemini (via LangGraph)
-- Thread-scoped RAG: upload and query PDFs, TXT, Markdown, DOCX
+- Chat agent with Google Gemini (LangGraph)
+- Upload/query PDFs, TXT, DOCX, MD per thread (RAG)
 - Multi-agent orchestration for evidence synthesis
-- MCP servers for FDA label, FAERS, clinical trials, PubMed, and shared tools
+- Modular MCP servers for domain tools
 
-## API Endpoints (Highlights)
+## Key API Endpoints
+- `POST /api/chat/initialize` — Start chat thread
+- `POST /api/chat/batch` — Send message
+- `POST /api/chat/stream` — Stream response
+- `POST /api/chat/documents/upload` — Upload docs
+- `GET /api/tools` — List tools
+- `POST /api/interpret` — FDA label summary
 
-- `POST /api/chat/initialize` – Start a new chat thread
-- `POST /api/chat/batch` – Send messages to the agent
-- `POST /api/chat/stream` – Stream responses (SSE)
-- `POST /api/chat/documents/upload` – Upload documents for RAG
-- `GET /api/tools` – List available tools by agent
-- `POST /api/interpret` – Get plain-language FDA label summaries
-
-See Swagger UI for full API details.
+See Swagger UI for all endpoints.
 
 ## Project Structure
 
 ```
 main.py
 requirements.txt
-agent/           # Chat agent, model registry
-api/             # FastAPI routers
-assets/          # Field definitions
-mcp_servers/     # Domain-specific MCP servers
-services/        # Service container, orchestrator, thread management
-tests/           # Pytest-based tests
+agent/         # Model & agent registry
+api/           # FastAPI routers
+assets/        # Field definitions
+mcp_servers/   # Domain MCP servers
+services/      # Service, RAG, orchestration
+tests/         # Pytest
 ```
 
 ## Development
-
-- Format/lint: use `ruff`, `black`, etc. (not bundled)
-- Run tests: `pytest`
-- Logging: via `uvicorn.error`
+- Format/lint: `ruff`, `black`
+- Test: `pytest`
+- Logging: `uvicorn.error`
 
 ## Troubleshooting
-
-- Missing API key: check `.env` and environment variables
-- Chat not initialized: call `/api/chat/initialize` first
-- RAG not working: ensure documents are uploaded and listed
+- Missing API key: check `.env`
+- Chat not initialized: call `/api/chat/initialize`
+- RAG not working: ensure docs are uploaded
 
 ---
-For details on MCP server endpoints and prompts, see the code in `mcp_servers/`.
+For advanced usage and MCP server details, see `mcp_servers/`.
 
 ## Getting Started
 ### Prerequisites

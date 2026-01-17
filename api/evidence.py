@@ -6,7 +6,6 @@ from services.container import Services
 router = APIRouter(prefix="/api/evidence")
 
 class EvidenceRequest(BaseModel):
-    thread_id: str
     drug_set_id: str
     drug_name: str
     age: str
@@ -18,7 +17,6 @@ class EvidenceRequest(BaseModel):
     other_medications: Optional[str] = None
 
 class EvidenceResponse(BaseModel):
-    thread_id: str
     drug_set_id: str
     drug_name: str
     faers_explanation: str
@@ -31,17 +29,12 @@ async def generate_evidence_report(payload: EvidenceRequest, request: Request):
     services: Services | None = getattr(request.app.state, "services", None)
     if services is None:
         raise HTTPException(status_code=500, detail="Services not initialized")
-    
-    thread_id = (payload.thread_id or "").strip()
-    if not thread_id:
-        raise HTTPException(status_code=400, detail="thread_id is required")
 
     request_data = payload.model_dump(exclude={"thread_id"})
     evidence_service = services.evidence
-    report = await evidence_service.execute_workflow(request_data, thread_id=thread_id)
+    report = await evidence_service.execute_workflow(request_data)
 
     return EvidenceResponse(
-        thread_id=thread_id,
         drug_set_id=payload.drug_set_id,
         drug_name=payload.drug_name,
         faers_explanation=report.get("faers_explanation") or "",
