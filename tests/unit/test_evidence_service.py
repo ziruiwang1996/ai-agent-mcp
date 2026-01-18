@@ -10,7 +10,7 @@ from services.evidence_service import EvidenceService
 def test_execute_workflow_maps_explanations(monkeypatch: pytest.MonkeyPatch):
     service = EvidenceService()
     monkeypatch.setattr(
-        service.app,
+        service._app,
         "ainvoke",
         AsyncMock(
             return_value={

@@ -65,7 +65,7 @@ def test_should_use_rag_respects_empty_store():
 def test_clear_chat_history_uses_checkpointer():
     chat_service = ChatService.__new__(ChatService)
     delete_thread = Mock()
-    chat_service.checkpointer = SimpleNamespace(delete_thread=delete_thread)
+    chat_service._checkpointer = SimpleNamespace(delete_thread=delete_thread)
 
     chat_service.clear_chat_history("thread-123")
     delete_thread.assert_called_once_with("thread-123")
@@ -90,7 +90,7 @@ def test_call_model_requires_thread_id():
     chat_service = ChatService.__new__(ChatService)
     chat_service._vs_service = _DummyVectorStore()
     chat_service._chat_agent = SimpleNamespace(chat_model=_DummyChatModel())
-    chat_service.trimmer = SimpleNamespace(invoke=lambda messages: messages)
+    chat_service._trimmer = SimpleNamespace(invoke=lambda messages: messages)
 
     import asyncio
 
@@ -106,7 +106,7 @@ def test_call_model_injects_rag_context():
     ]
     chat_service._vs_service = _DummyVectorStore(has_store=True, empty=False, docs=docs)
     chat_service._chat_agent = SimpleNamespace(chat_model=_DummyChatModel())
-    chat_service.trimmer = SimpleNamespace(invoke=lambda messages: messages)
+    chat_service._trimmer = SimpleNamespace(invoke=lambda messages: messages)
 
     import asyncio
 
@@ -127,7 +127,7 @@ def test_call_model_timeout_returns_error(monkeypatch: pytest.MonkeyPatch):
     chat_service = ChatService.__new__(ChatService)
     chat_service._vs_service = _DummyVectorStore()
     chat_service._chat_agent = SimpleNamespace(chat_model=_DummyChatModel())
-    chat_service.trimmer = SimpleNamespace(invoke=lambda messages: messages)
+    chat_service._trimmer = SimpleNamespace(invoke=lambda messages: messages)
 
     import asyncio
 

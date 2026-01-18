@@ -15,12 +15,12 @@ class ChatService:
         self._vs_service = VectorStoreService()
         self._agent_registry = AgentRegistry.get_instance()
         self._chat_agent: Optional[MCPAgent] = None
-        self.trimmer: list[BaseMessage] = None
+        self._trimmer: list[BaseMessage] = None
 
         self._workflow = StateGraph(state_schema=MessagesState)
         self._register_nodes()
-        self.checkpointer = MemorySaver()
-        self.app = self._workflow.compile(checkpointer=self.checkpointer)
+        self._checkpointer = MemorySaver()
+        self._app = self._workflow.compile(checkpointer=self._checkpointer)
     
     async def initialize(self) -> None:
         if self._chat_agent is not None:
@@ -33,7 +33,7 @@ class ChatService:
         return self._chat_agent is not None
     
     def clear_chat_history(self, thread_id: str) -> None:
-        checkpointer = getattr(self, "checkpointer", None)
+        checkpointer = self._checkpointer
         if checkpointer is None:
             return
         delete_fn = getattr(checkpointer, "delete_thread", None)
@@ -62,7 +62,7 @@ class ChatService:
             if hasattr(self._chat_agent.chat_model, "get_num_tokens_from_messages")
             else self._count_tokens_fallback
         )
-        self.trimmer = trim_messages(
+        self._trimmer = trim_messages(
             max_tokens=window_size,
             strategy="last",
             token_counter=token_counter,
@@ -115,9 +115,9 @@ class ChatService:
             raise ValueError("thread_id is required in RunnableConfig for chat service")
 
         # Trim message history to fit context window
-        if not self.trimmer:
+        if not self._trimmer:
             self.set_context_window()
-        trimmed_messages = self.trimmer.invoke(state["messages"])
+        trimmed_messages = self._trimmer.invoke(state["messages"])
         last_message = trimmed_messages[-1] if trimmed_messages else None
         user_query = last_message.content if last_message and hasattr(last_message, "content") else ""
 
@@ -214,7 +214,7 @@ class ChatService:
     async def chat(self, user_input: str, config: dict[str, Any]) -> Optional[str]:
         try:
             output = await asyncio.wait_for(
-                self.app.ainvoke({"messages": [HumanMessage(user_input)]}, config),
+                self._app.ainvoke({"messages": [HumanMessage(user_input)]}, config),
                 timeout=60.0,
             )
             # Extract the assistant's last message

@@ -24,7 +24,7 @@ class EvidenceService:
 
         self._workflow = StateGraph(WorkflowState)
         self._register_nodes()
-        self.app = self._workflow.compile()
+        self._app = self._workflow.compile()
 
     def _register_nodes(self) -> None:
         # upstream resources collectors 
@@ -195,7 +195,7 @@ class EvidenceService:
             "conditions": input_data.get('conditions'),
             "other_medications": input_data.get('other_medications')
         }
-        output = await self.app.ainvoke(
+        output = await self._app.ainvoke(
             {
                 "set_id": input_data.get("drug_set_id", ""),
                 "drug_name": input_data.get("drug_name", ""),

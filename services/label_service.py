@@ -19,7 +19,7 @@ class LabelService:
 
         self._workflow = StateGraph(WorkflowState)
         self._register_nodes()
-        self.app = self._workflow.compile()
+        self._app = self._workflow.compile()
     
     def _register_nodes(self) -> None:
         self._workflow.add_node("interpreter_agent", self._run_label_interpreter)
@@ -74,5 +74,5 @@ class LabelService:
             }
         
     async def execute_workflow(self, input_data: dict[str, Any]) -> str:
-        output = await self.app.ainvoke(input_data)
+        output = await self._app.ainvoke(input_data)
         return output['explanation']

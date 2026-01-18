@@ -70,16 +70,16 @@ class ThreadService:
         if max_threads <= 0:
             raise ValueError(f"max_threads must be positive, got {max_threads}")
         self.max_threads = max_threads
-        self.cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self.cleanup_callback = cleanup_callback
     
     def get(self, thread_id: str) -> Optional[dict[str, Any]]:
         """
         Get thread config and mark as recently used.
         """
-        if thread_id in self.cache:
-            self.cache.move_to_end(thread_id)
-            return self.cache[thread_id]
+        if thread_id in self._cache:
+            self._cache.move_to_end(thread_id)
+            return self._cache[thread_id]
         return None
     
     def set(self, thread_id: str, config: dict[str, Any]) -> None:
@@ -88,13 +88,13 @@ class ThreadService:
         If thread exists: Updates config and marks as recently used.
         If thread is new and cache is full: Evicts oldest thread first.
         """
-        if thread_id in self.cache:
-            self.cache.move_to_end(thread_id)
-            self.cache[thread_id] = config
+        if thread_id in self._cache:
+            self._cache.move_to_end(thread_id)
+            self._cache[thread_id] = config
         else:
-            if len(self.cache) >= self.max_threads:
+            if len(self._cache) >= self.max_threads:
                 self._evict_oldest()
-            self.cache[thread_id] = config
+            self._cache[thread_id] = config
     
     def remove(self, thread_id: str) -> bool:
         """
@@ -102,8 +102,8 @@ class ThreadService:
         Note: This does NOT call the cleanup callback. Use this for manual
         removal where you want to handle cleanup separately.
         """
-        if thread_id in self.cache:
-            del self.cache[thread_id]
+        if thread_id in self._cache:
+            del self._cache[thread_id]
             return True
         return False
     
@@ -113,11 +113,11 @@ class ThreadService:
         This is called automatically when cache reaches capacity.
         Calls cleanup callback if provided before removing the thread.
         """
-        if len(self.cache) == 0:
+        if len(self._cache) == 0:
             return
         
         # Remove oldest (first) thread
-        oldest_thread_id, oldest_config = self.cache.popitem(last=False)
+        oldest_thread_id, oldest_config = self._cache.popitem(last=False)
         print(f"Evicted oldest thread: {oldest_thread_id[:8]}... (cache full)")
         
         # Call cleanup callback if provided
@@ -138,24 +138,24 @@ class ThreadService:
         Returns:
             Number of threads that were cleared
         """
-        count = len(self.cache)
+        count = len(self._cache)
         if call_cleanup and self.cleanup_callback:
-            for thread_id in list(self.cache.keys()):
+            for thread_id in list(self._cache.keys()):
                 try:
                     self.cleanup_callback(thread_id)
                 except Exception as e:
                     print(f"Error in cleanup callback for {thread_id[:8]}: {e}")
-        self.cache.clear()
+        self._cache.clear()
         print(f"Cleared {count} threads from cache")
         return count
     
     def __contains__(self, thread_id: str) -> bool:
         """Check if thread exists in cache."""
-        return thread_id in self.cache
+        return thread_id in self._cache
     
     def __len__(self) -> int:
         """Get current number of threads in cache."""
-        return len(self.cache)
+        return len(self._cache)
     
     def get_stats(self) -> dict[str, Any]:
         """
@@ -168,9 +168,9 @@ class ThreadService:
             - utilization: Percentage string (e.g., "45.0%")
         """
         return {
-            "current_threads": len(self.cache),
+            "current_threads": len(self._cache),
             "max_threads": self.max_threads,
-            "utilization": f"{len(self.cache) / self.max_threads * 100:.1f}%"
+            "utilization": f"{len(self._cache) / self.max_threads * 100:.1f}%"
         }
     
     def get_thread_ids(self) -> list[str]:
@@ -182,7 +182,7 @@ class ThreadService:
         Returns:
             List of thread IDs
         """
-        return list(self.cache.keys())
+        return list(self._cache.keys())
     
     def get_all(self) -> dict[str, dict[str, Any]]:
         """
@@ -194,4 +194,4 @@ class ThreadService:
         Returns:
             Dictionary mapping thread_id -> config
         """
-        return dict(self.cache)
+        return dict(self._cache)

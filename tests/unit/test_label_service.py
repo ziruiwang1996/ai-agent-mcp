@@ -14,7 +14,7 @@ def test_label_service_workflow():
         mock_registry.resolve = AsyncMock(return_value=mock_agent)
         label_service = LabelService()
         input_data = {"drug_name": "Aspirin", "section_name": "usage", "section_content": "Pain relief"}
-        with patch.object(label_service.app, "ainvoke", AsyncMock(return_value={"explanation": "Test explanation"})):
+        with patch.object(label_service._app, "ainvoke", AsyncMock(return_value={"explanation": "Test explanation"})):
             import asyncio
 
             result = asyncio.run(label_service.execute_workflow(input_data))
