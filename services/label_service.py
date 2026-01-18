@@ -14,8 +14,8 @@ class WorkflowState(TypedDict, total=False):
 
 class LabelService:
     def __init__(self):
-        self._model_registry = ModelRegistry.get_instance()
-        self._agent_registry = AgentRegistry.get_instance()
+        self._model_registry = ModelRegistry()
+        self._agent_registry = AgentRegistry()
 
         self._workflow = StateGraph(WorkflowState)
         self._register_nodes()

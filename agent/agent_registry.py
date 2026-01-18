@@ -68,12 +68,6 @@ class AgentRegistry:
         self._model_registry = ModelRegistry()
         self._init_locks: dict[str, asyncio.Lock] = {}
 
-    @staticmethod
-    def get_instance() -> "AgentRegistry":
-        if AgentRegistry._instance is None:
-            AgentRegistry._instance = AgentRegistry()
-        return AgentRegistry._instance
-
     async def _ensure_agent(self, spec: AgentSpec) -> MCPAgent:
         chat_model_instance = self._model_registry.resolve(spec.chat_model_key)
         agent_instance = MCPAgent(

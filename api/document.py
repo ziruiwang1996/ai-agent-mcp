@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
+from pydantic import BaseModel
+from typing import Any, List
 from services.container import Services
 from services.vector_store_service import VectorStoreService
 from pathlib import Path
@@ -6,8 +8,25 @@ import tempfile
 import os
 
 router = APIRouter(prefix="/api/documents")
-
 ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".txt", ".md", ".docx"}
+
+class DocumentMetadata(BaseModel):
+    filename: str
+
+class UploadDocumentResponse(BaseModel):
+    message: str
+    document: Any  # Or DocumentMetadata if you know the structure
+    thread_id: str
+
+class ListDocumentsResponse(BaseModel):
+    thread_id: str
+    documents: List[Any]  # Or List[DocumentMetadata]
+    count: int
+
+class ClearDocumentsResponse(BaseModel):
+    thread_id: str
+    message: str
+    documents_removed: int
 
 def _get_doc_service(request: Request) -> VectorStoreService:
     services: Services | None = getattr(request.app.state, "services", None)
@@ -20,7 +39,7 @@ def _require_thread_id(thread_id: str) -> str:
         raise HTTPException(status_code=400, detail="thread_id is required")
     return thread_id
 
-@router.post("/upload")
+@router.post("/upload", response_model=UploadDocumentResponse)
 async def upload_document(
     request: Request,
     file: UploadFile = File(...),
@@ -54,16 +73,16 @@ async def upload_document(
             file_path=temp_path,
             filename=file.filename,
         )
-        return {
-            "message": "Document uploaded successfully",
-            "document": doc_metadata,
-            "thread_id": thread_id,
-        }
+        return UploadDocumentResponse(
+            thread_id=thread_id,
+            message="Document uploaded successfully",
+            document=doc_metadata,
+        )
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
 
-@router.get("/list/{thread_id}")
+@router.get("/list/{thread_id}", response_model=ListDocumentsResponse)
 async def list_documents(thread_id: str, request: Request):
     """
     Get list of all documents uploaded for a thread.
@@ -86,13 +105,13 @@ async def list_documents(thread_id: str, request: Request):
     """
     doc_service = _get_doc_service(request)
     documents = doc_service.get_thread_documents(thread_id)
-    return {
-        "thread_id": thread_id, 
-        "documents": documents, 
-        "count": len(documents)
-    }
+    return ListDocumentsResponse(
+        thread_id=thread_id,
+        documents=documents,
+        count=len(documents),
+    )
 
-@router.delete("/clear/{thread_id}")
+@router.delete("/clear/{thread_id}", response_model=ClearDocumentsResponse)
 async def clear_documents(thread_id: str, request: Request):
     """
     Clear all documents for a thread.
@@ -121,8 +140,8 @@ async def clear_documents(thread_id: str, request: Request):
     doc_service = _get_doc_service(request)
     docs_before = len(doc_service.get_thread_documents(thread_id))
     doc_service.clear_thread_documents(thread_id)
-    return {
-        "thread_id": thread_id,
-        "message": "Documents cleared successfully",
-        "documents_removed": docs_before,
-    }
+    return ClearDocumentsResponse(
+        thread_id=thread_id,
+        message="Documents cleared successfully",
+        documents_removed=docs_before,
+    )

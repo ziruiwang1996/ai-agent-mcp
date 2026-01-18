@@ -4,7 +4,6 @@ from typing import Any, Mapping, Union
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 import os
-from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
@@ -50,12 +49,6 @@ class ModelRegistry:
         self._registry: Mapping[str, ModelSpec] = DEFAULT_MODEL_REGISTRY
         self._cache: dict[str, BaseChatModel | InferenceClient] = {}
         self._initialized = True
-
-    @staticmethod
-    def get_instance() -> "ModelRegistry":
-        if ModelRegistry._instance is None:
-            ModelRegistry._instance = ModelRegistry()
-        return ModelRegistry._instance
     
     def resolve(self, ref: Union[str, ModelSpec, BaseChatModel, InferenceClient]) -> BaseChatModel | InferenceClient:
         """Resolve a model reference into a concrete LangChain chat model.
@@ -113,7 +106,6 @@ class ModelRegistry:
         return list(self._cache.keys())
     
     def _via_huggingface_endpoint(self, spec: ModelSpec) -> ChatHuggingFace:
-        load_dotenv()
         llm = HuggingFaceEndpoint(
             repo_id=spec.name,
             task=spec.kwargs.get("task") if spec.kwargs else None,
@@ -126,14 +118,9 @@ class ModelRegistry:
         return chat_model
     
     def _via_init_chat_model(self, spec: ModelSpec) -> BaseChatModel:
-        load_dotenv()
-        if not os.getenv("GOOGLE_API_KEY"):
-            raise ValueError("GOOGLE_API_KEY environment variable is not set.")
-        os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
         return init_chat_model(spec.name, model_provider=spec.provider, **(spec.kwargs or {}))
 
     def _via_inference_client(self, spec: ModelSpec) -> InferenceClient:
-        load_dotenv()
         token = os.environ.get("HF_API_TOKEN")
         if not token:
             raise ValueError("HF_API_TOKEN environment variable is not set.")

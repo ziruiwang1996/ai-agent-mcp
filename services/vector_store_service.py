@@ -8,7 +8,15 @@ from datetime import datetime
 from langchain_core.documents import Document
 import os
 
+# Singleton pattern for in-memory storage, remove the pattern if switch to persistent vector store later
 class VectorStoreService:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(VectorStoreService, cls).__new__(cls)
+        return cls._instance
+    
     def __init__(self, embedding: str = "models/gemini-embedding-001"):
         self.thread_vector_stores: dict[str, InMemoryVectorStore] = {}
         self.thread_documents: dict[str, list[dict[str, Any]]] = {}

@@ -2,6 +2,11 @@ import certifi
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("GOOGLE_API_KEY environment variable is not set.")
+os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
 # Align Python SSL clients with certifi so async HTTPS calls succeed in dev/runtime.
 _CERT_PATH = certifi.where()
 os.environ.setdefault("SSL_CERT_FILE", _CERT_PATH)
@@ -15,7 +20,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from services.container import Services, build_services
-from api import chat, interpret, tools, evidence
+from api import chat, interpret, tools, evidence, document
 from pydantic import BaseModel
 
 @asynccontextmanager
@@ -28,6 +33,7 @@ app.include_router(chat.router)
 app.include_router(interpret.router)
 app.include_router(tools.router)
 app.include_router(evidence.router)
+app.include_router(document.router)
 
 # Allow CORS for local development
 app.add_middleware(
