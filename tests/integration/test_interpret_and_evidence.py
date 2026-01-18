@@ -6,24 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-def test_interpret_requires_thread_id(client: TestClient):
-    response = client.post(
-        "/api/interpret",
-        json={
-            "thread_id": "",
-            "drug_name": "Aspirin",
-            "section_name": "usage",
-            "section_content": "Pain relief",
-        },
-    )
-    assert response.status_code == 400
-
-
 def test_interpret_returns_payload(client: TestClient):
     response = client.post(
         "/api/interpret",
         json={
-            "thread_id": "thread-1",
             "drug_name": "Aspirin",
             "section_name": "usage",
             "section_content": "Pain relief",
@@ -34,28 +20,21 @@ def test_interpret_returns_payload(client: TestClient):
     assert payload["interpretation"] == "interpretation"
 
 
-def test_evidence_requires_thread_id(client: TestClient):
+def test_interpret_validation_error(client: TestClient):
     response = client.post(
-        "/api/evidence",
+        "/api/interpret",
         json={
-            "thread_id": "",
-            "drug_set_id": "set-1",
-            "drug_name": "Drug",
-            "age": "30",
-            "sex": "f",
-            "weight": "70",
-            "is_pregnant": False,
-            "is_breastfeeding": False,
+            "drug_name": "Aspirin",
+            "section_name": "usage",
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 def test_evidence_returns_report(client: TestClient):
     response = client.post(
         "/api/evidence",
         json={
-            "thread_id": "thread-2",
             "drug_set_id": "set-1",
             "drug_name": "Drug",
             "age": "30",
@@ -68,6 +47,18 @@ def test_evidence_returns_report(client: TestClient):
     assert response.status_code == 200
     payload = response.json()
     assert payload["summary"] == "summary"
+
+
+def test_evidence_validation_error(client: TestClient):
+    response = client.post(
+        "/api/evidence",
+        json={
+            "drug_set_id": "set-1",
+            "drug_name": "Drug",
+            "age": "30",
+        },
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.external
@@ -84,7 +75,6 @@ def test_external_interpret():
         response = test_client.post(
             "/api/interpret",
             json={
-                "thread_id": "ext-thread",
                 "drug_name": "Aspirin",
                 "section_name": "usage",
                 "section_content": "Pain relief",

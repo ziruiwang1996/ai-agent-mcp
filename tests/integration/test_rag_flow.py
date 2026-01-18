@@ -34,6 +34,19 @@ def test_document_upload_list_and_clear(documents_client: TestClient, tmp_path: 
     assert cleared["documents_removed"] == 1
 
 
+def test_document_upload_rejects_extension(documents_client: TestClient, tmp_path: Path):
+    file_path = tmp_path / "test_document.exe"
+    file_path.write_text("nope", encoding="utf-8")
+
+    with file_path.open("rb") as handle:
+        response = documents_client.post(
+            "/api/documents/upload",
+            files={"file": ("test_document.exe", handle)},
+            data={"thread_id": "thread-2"},
+        )
+    assert response.status_code == 400
+
+
 @pytest.mark.external
 def test_external_document_upload(tmp_path: Path, external_services):
     file_path = tmp_path / "external_doc.txt"

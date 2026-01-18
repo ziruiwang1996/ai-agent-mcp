@@ -125,3 +125,31 @@ def test_retrieve_context_for_query_without_scores(monkeypatch: pytest.MonkeyPat
     results = vs.retrieve_context_for_query(thread_id, "query", k=1)
     assert len(results) == 1
     assert results[0][1] == 1.0
+
+
+def test_clear_thread_documents_removes_metadata(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "services.vector_store_service.GoogleGenerativeAIEmbeddings",
+        lambda model: _DummyEmbeddings(),
+    )
+    vs = VectorStoreService()
+    vs.thread_vector_stores["thread-1"] = _DummyVectorStore()
+    vs.thread_documents["thread-1"] = [{"filename": "doc.txt"}]
+
+    vs.clear_thread_documents("thread-1")
+
+    assert "thread-1" not in vs.thread_vector_stores
+    assert "thread-1" not in vs.thread_documents
+
+
+def test_is_vector_store_empty_checks_store_attribute(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "services.vector_store_service.GoogleGenerativeAIEmbeddings",
+        lambda model: _DummyEmbeddings(),
+    )
+    vs = VectorStoreService()
+    store = _DummyVectorStore()
+    store.store = {"id": "doc"}
+    vs.thread_vector_stores["thread-1"] = store
+
+    assert vs.is_vector_store_empty("thread-1") is False
